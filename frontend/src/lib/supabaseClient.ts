@@ -17,3 +17,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl ?? "", supabaseAnonKey ?? "");
+
+export const supabaseConnectionInfo = {
+  mode: import.meta.env.MODE,
+  supabaseUrl: supabaseUrl ?? null,
+  hasAnonKey: Boolean(supabaseAnonKey),
+  functionsEndpoint: supabaseUrl
+    ? `${supabaseUrl.replace(/\/$/, "")}/functions/v1`
+    : null,
+  generatedAt: new Date().toISOString(),
+};
+
+console.groupCollapsed("🔌 [Backend] Supabase connection");
+console.table(supabaseConnectionInfo);
+console.groupEnd();

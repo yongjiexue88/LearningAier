@@ -27,6 +27,36 @@ SUPABASE_ENV_TARGET=prod ./scripts/serve-function.sh ai-notes-process
 
 The script simply forwards to `npx supabase functions serve ... --env-file .env.<target>`, so you can set `SUPABASE_ENV_TARGET` in your shell if you prefer (`export SUPABASE_ENV_TARGET=prod`).
 
+### Applying migrations / writing data
+
+- **Local stack**
+  ```bash
+  cd backend
+  npx supabase start               # spins up Docker services
+  npx supabase db reset            # rebuilds DB + runs migrations
+  ```
+- **Hosted project**
+  1. Escape-sensitive env vars in `.env.prod` already use single quotes, so you can safely load them:
+     ```bash
+     cd backend
+     set -a
+     source .env.prod
+     set +a
+     ```
+  2. Push migrations or run SQL using the remote Postgres URL:
+     ```bash
+     npx supabase db push --db-url "$POSTGRES_URL"
+     # or run seed scripts / psql with $POSTGRES_URL_NON_POOLING
+     ```
+  3. (Optional) Link the CLI to the hosted project once you’ve logged in:
+     ```bash
+     npx supabase login                       # obtain CLI access token
+     npx supabase link --project-ref beelemrsnwzdhsukiyuq
+     npx supabase db push                     # now targets the linked project
+     ```
+
+This lets you switch between local Docker and hosted Supabase by picking the env file and running the same CLI commands.
+
 ## 1. Phased Roadmap
 
 | Phase | Focus | Deliverables |
@@ -46,6 +76,8 @@ The script simply forwards to `npx supabase functions serve ... --env-file .env.
 All SQL lives in `supabase/migrations/0001_init_schema.sql` and mirrors the canonical spec:
 
 - `profiles`: extends `auth.users` with display name + preferred LLM provider/model.
+- A trigger (`on_auth_user_created`) automatically inserts a blank `profiles` row on every new signup so frontend settings can rely on it existing.
+- **Auth storage**: Supabase credentials (email/password, metadata) live inside `auth.users` (managed by Supabase Auth, not the `public` schema). Use Supabase Studio → Authentication → Users or a service-role query (`select id,email from auth.users`) to inspect accounts. The `profiles` table only holds supplemental info we control, while the auth subsystem keeps password hashes and login state separate for security.
 - `folders`: hierarchical note/document containers (`parent_id` self-reference).
 - `documents`: uploaded PDFs stored in Supabase Storage (keeps `file_path` reference).
 - `notes`: bilingual Markdown content plus link to source document/folder.
