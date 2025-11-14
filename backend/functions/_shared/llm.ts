@@ -22,8 +22,10 @@ export async function getLLMClient(
     throw new Error(`Failed to load profile: ${error.message}`);
   }
 
+  const providerSource = data?.llm_provider ?? runtime.defaultLLMProvider;
+  const provider = providerSource.toLowerCase();
   return new LLMClient({
-    provider: data?.llm_provider ?? runtime.defaultLLMProvider,
+    provider,
     model: data?.llm_model ?? runtime.defaultLLMModel,
     apiKey: runtime.llmApiKey,
     baseUrl: runtime.llmBaseUrl,

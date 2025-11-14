@@ -27,6 +27,12 @@ SUPABASE_ENV_TARGET=prod ./scripts/serve-function.sh ai-notes-process
 
 The script simply forwards to `npx supabase functions serve ... --env-file .env.<target>`, so you can set `SUPABASE_ENV_TARGET` in your shell if you prefer (`export SUPABASE_ENV_TARGET=prod`).
 
+### AI providers & embeddings
+
+- Google Gemini (`gemini-2.5-flash`) is the default LLM provider. Populate `LLM_API_KEY` inside `.env.local` / `.env.prod` with your Gemini key (the same key also powers embeddings).
+- Retrieval now relies on Google `text-embedding-004` trimmed to 1536 dimensions (to stay within pgvector's ANN index cap). Apply `0002_gemini_embeddings.sql` after the initial schema and then rerun `notes-reindex` for every note to store the resized embeddings.
+- Override providers/models per user via the `profiles` table as before; the backend automatically lowercases provider ids and routes requests to either OpenAI-compatible or Gemini clients.
+
 ### Applying migrations / writing data
 
 - **Local stack**

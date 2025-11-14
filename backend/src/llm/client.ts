@@ -1,3 +1,5 @@
+import { GoogleGenAI } from "npm:@google/genai";
+
 export interface LLMConfig {
   provider: string;
   model: string;
@@ -16,6 +18,8 @@ export interface JSONGenerationParams {
 }
 
 export class LLMClient {
+  private googleClient?: GoogleGenAI;
+
   constructor(private readonly config: LLMConfig) {
     if (!config.apiKey) {
       throw new Error("Missing LLM API key");
@@ -29,9 +33,21 @@ export class LLMClient {
     switch (this.config.provider) {
       case "openai":
         return this.generateViaOpenAI<T>(params);
+      case "gemini":
+      case "google":
+        return this.generateViaGemini<T>(params);
       default:
         return this.generateViaOpenAICompatible<T>(params);
     }
+  }
+
+  private getGoogleClient(): GoogleGenAI {
+    if (!this.googleClient) {
+      this.googleClient = new GoogleGenAI({
+        apiKey: this.config.apiKey,
+      });
+    }
+    return this.googleClient;
   }
 
   private async generateViaOpenAI<T>(params: JSONGenerationParams): Promise<T> {
@@ -117,5 +133,36 @@ export class LLMClient {
       throw new Error("LLM response missing text content");
     }
     return JSON.parse(content) as T;
+  }
+
+  private async generateViaGemini<T>(params: JSONGenerationParams): Promise<T> {
+    const client = this.getGoogleClient();
+    const response = await client.models.generateContent({
+      model: this.config.model,
+      contents: [
+        { role: "user", parts: [{ text: params.userPrompt.trim() }] },
+      ],
+      config: {
+        systemInstruction: {
+          role: "system",
+          parts: [{ text: params.systemPrompt.trim() }],
+        },
+        responseMimeType: "application/json",
+        responseSchema: params.schema as any,
+        temperature: params.temperature ?? 0.2,
+        maxOutputTokens: params.maxOutputTokens ?? 1024,
+      },
+    });
+
+    const text = response.text;
+    if (typeof text !== "string" || !text.trim()) {
+      throw new Error("Gemini response missing text content");
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch (error) {
+      throw new Error(`Gemini response was not valid JSON: ${text}`);
+    }
   }
 }

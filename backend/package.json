@@ -1,5 +1,8 @@
 {
   "devDependencies": {
     "supabase": "^2.58.5"
+  },
+  "dependencies": {
+    "@google/genai": "^1.29.1"
   }
 }

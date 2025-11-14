@@ -25,11 +25,16 @@ export function SettingsPage() {
       <Card>
         <CardContent>
           <Stack spacing={2}>
-            <TextField select label="LLM Provider" fullWidth>
+            <TextField select label="LLM Provider" fullWidth defaultValue="gemini">
               <MenuItem value="openai">OpenAI</MenuItem>
               <MenuItem value="gemini">Google Gemini</MenuItem>
             </TextField>
-            <TextField label="Model name" placeholder="gpt-4.1-mini" fullWidth />
+            <TextField
+              label="Model name"
+              placeholder="gemini-2.5-flash"
+              defaultValue="gemini-2.5-flash"
+              fullWidth
+            />
             <TextField label="Preferred language" placeholder="Auto-detect" fullWidth />
             <Button variant="contained">Save settings</Button>
           </Stack>

@@ -21,21 +21,32 @@ export interface RuntimeConfig {
   defaultLLMModel: string;
   llmApiKey: string;
   llmBaseUrl?: string;
+  embeddingsProvider?: string;
   embeddingsModel: string;
   embeddingsApiKey?: string;
   embeddingsBaseUrl?: string;
+  embeddingsDimensions: number;
 }
 
 export function getRuntimeConfig(): RuntimeConfig {
+  const defaultLLMProvider = getEnv("DEFAULT_LLM_PROVIDER", "gemini")!;
+  const embeddingsDimensionsRaw = Number(
+    getEnv("EMBEDDINGS_DIMENSIONS", "1536")
+  );
+  const embeddingsDimensions = Number.isFinite(embeddingsDimensionsRaw)
+    ? embeddingsDimensionsRaw
+    : 1536;
   return {
     supabaseUrl: requireEnv("SUPABASE_URL"),
     supabaseServiceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    defaultLLMProvider: getEnv("DEFAULT_LLM_PROVIDER", "openai")!,
-    defaultLLMModel: getEnv("DEFAULT_LLM_MODEL", "gpt-4.1-mini")!,
+    defaultLLMProvider,
+    defaultLLMModel: getEnv("DEFAULT_LLM_MODEL", "gemini-2.5-flash")!,
     llmApiKey: requireEnv("LLM_API_KEY"),
     llmBaseUrl: getEnv("LLM_BASE_URL"),
-    embeddingsModel: getEnv("EMBEDDINGS_MODEL", "text-embedding-3-large")!,
+    embeddingsProvider: getEnv("EMBEDDINGS_PROVIDER") ?? defaultLLMProvider,
+    embeddingsModel: getEnv("EMBEDDINGS_MODEL", "text-embedding-004")!,
     embeddingsApiKey: getEnv("EMBEDDINGS_API_KEY"),
     embeddingsBaseUrl: getEnv("EMBEDDINGS_BASE_URL"),
+    embeddingsDimensions,
   };
 }
