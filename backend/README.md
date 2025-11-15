@@ -106,13 +106,13 @@ Populate them using the Firebase console/SDKs; the Express server only orchestra
 Frontend env files now expose Firebase + API keys:
 
 ```
-VITE_FIREBASE_API_KEY=AIzaSyBC7tF0O651cNAyLyEJ25i2rPWVGQa9ICg
-VITE_FIREBASE_AUTH_DOMAIN=learningaier.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=learningaier
-VITE_FIREBASE_STORAGE_BUCKET=learningaier.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=330193246496
-VITE_FIREBASE_APP_ID=1:330193246496:web:a8c15c3f4dbeef60e8df45
-VITE_FIREBASE_MEASUREMENT_ID=G-ZB04YPVXMN
+VITE_FIREBASE_API_KEY=<your firebase api key>
+VITE_FIREBASE_AUTH_DOMAIN=<your auth domain>
+VITE_FIREBASE_PROJECT_ID=<your project id>
+VITE_FIREBASE_STORAGE_BUCKET=<your storage bucket>
+VITE_FIREBASE_MESSAGING_SENDER_ID=<your sender id>
+VITE_FIREBASE_APP_ID=<your app id>
+VITE_FIREBASE_MEASUREMENT_ID=<your measurement id>
 VITE_API_BASE_URL=http://localhost:8787/functions/v1
 ```
 
