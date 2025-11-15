@@ -7,7 +7,6 @@ import {
 } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { SupabaseProvider } from "./SupabaseProvider";
 
 const queryClient = new QueryClient();
 
@@ -46,7 +45,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <QueryClientProvider client={queryClient}>
-          <SupabaseProvider>{children}</SupabaseProvider>
+          {children}
           <ReactQueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
       </ThemeProvider>

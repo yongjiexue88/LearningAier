@@ -1,154 +1,123 @@
-# Study Assistant Backend
+# LearningAier Backend
 
-This folder tracks every backend artifact for the Study Assistant MVP. The scope is intentionally constrained to Supabase (Postgres + Auth + Storage + pgvector) and Edge Functions that power AI, retrieval, spaced repetition, and Pomodoro/task helpers.
+This backend now runs as a TypeScript/Express service that fronts Firebase Auth, Firestore, and Cloud Storage. Supabase Edge Functions are no longer used—each former function lives as an HTTP route under `/functions/v1/*`, preserving the payloads/responses expected by the frontend.
 
-## 0. Operating Model
+## Stack
 
-- **Single source of truth** for schema lives in `supabase/migrations/0001_init_schema.sql`. Apply it through Supabase CLI.
-- **Edge Functions** live under `functions/` and can be deployed via `supabase functions deploy <name> --project-ref ...`.
-- **Shared utilities** (LLM prompts, chunking, embeddings) live under `src/`.
-- Prefer **small, incremental tasks**. Each change should map to one spec phase (schema, CRUD policies, AI endpoints, etc.).
+- **Runtime:** Node 20+, Express 4, TypeScript
+- **Identity/Data:** Firebase Auth, Firestore, Cloud Storage
+- **AI:** Google Gemini (`gemini-2.5-flash`, `text-embedding-004`)
+- **PDF parsing:** `pdf-parse`
 
-### Environment targets
+## Getting Started
 
-- Two env files live at the repo root of `backend/`:
-  - `.env.local` → hooks into the `npx supabase start` Docker stack (default).
-  - `.env.prod` → points at the hosted Supabase project (`beelemrsnwzdhsukiyuq`).
-- Use the helper script to toggle which file is loaded:
+1. Install deps once:
+   ```bash
+   cd backend
+   npm install
+   ```
+2. Copy `.env.local` / `.env.prod` and populate the Firebase service account values:
+   - `FIREBASE_PROJECT_ID` / `FIREBASE_STORAGE_BUCKET` come directly from the Firebase console (project `learningaier`).
+   - Either supply `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY` (string with `\n` escapes) *or* drop the entire JSON credentials file into `FIREBASE_CREDENTIAL_JSON`.
+   - Keep the Gemini keys in `LLM_API_KEY` / `EMBEDDINGS_API_KEY`.
+3. Start the API locally (loads `.env.local` by default):
+   ```bash
+   npm run dev
+   # or APP_ENV=prod npm run dev to load .env.prod
+   ```
+4. Build / run for production:
+   ```bash
+   npm run build
+   npm start
+   ```
 
-```bash
-# Local (default)
-cd backend
-./scripts/serve-function.sh ai-notes-process
+## Environment Variables
 
-# Hosted project
-SUPABASE_ENV_TARGET=prod ./scripts/serve-function.sh ai-notes-process
+| Variable | Description |
+| --- | --- |
+| `PORT` | HTTP port (default `8787`). |
+| `FIREBASE_PROJECT_ID` | Firebase project id (`learningaier`). |
+| `FIREBASE_STORAGE_BUCKET` | Cloud Storage bucket (`learningaier.firebasestorage.app`). |
+| `FIREBASE_CLIENT_EMAIL` | Service account client email. |
+| `FIREBASE_PRIVATE_KEY` | Multiline private key (escape newlines as `\n`). |
+| `FIREBASE_CREDENTIAL_JSON` | (Optional) base64/JSON blob for credentials instead of the key pair. |
+| `DEFAULT_LLM_PROVIDER` / `DEFAULT_LLM_MODEL` | Default Gemini model routing. |
+| `LLM_API_KEY` / `LLM_BASE_URL` | API key + endpoint for Gemini JSON responses. |
+| `EMBEDDINGS_*` | Provider + model for embeddings (defaults mirror Gemini). |
+
+The server automatically loads `.env.<target>` based on `APP_ENV`/`NODE_ENV` (`local` by default).
+
+## Scripts
+
+| Command | Description |
+| --- | --- |
+| `npm run dev` | Starts the Express server with hot reload via `tsx watch`. |
+| `npm run build` | Type-checks and emits JS to `dist/`. |
+| `npm run start` | Runs the compiled server (`node dist/server.js`). |
+| `npm run lint` | Type-checks the project. |
+
+## API Surface (`/functions/v1/*`)
+
+| Route | Purpose |
+| --- | --- |
+| `POST /ai-notes-process` | Generate bilingual note draft JSON from free-form text. |
+| `POST /ai-notes-translate` | Translate/sync a note between zh/en, optionally loading note content. |
+| `POST /ai-notes-terminology` | Extract bilingual terminology/flashcards from text. |
+| `POST /ai-notes-qa` | Strict-context Q&A with embeddings + RAG filtering. |
+| `POST /documents-upload-process` | Fetch a PDF from Firebase Storage, extract text, and produce a draft note. |
+| `POST /notes-reindex` | Chunk + embed bilingual note content into `note_chunks`. |
+| `POST /ai-flashcards-generate` | Generate flashcards from a note and optionally persist them. |
+| `POST /flashcards-review` | Apply an SM-style review response and schedule the next due date. |
+
+All routes require a valid Firebase ID token in the `Authorization: Bearer <token>` header.
+
+## Firestore Collections
+
+The service expects collections that mirror the former Supabase tables:
+
+- `profiles` – per-user LLM preferences (`llm_provider`, `llm_model`).
+- `folders`, `notes`, `documents` – core workspace structure.
+- `note_chunks` – embeddings (stores `note_id`, `user_id`, `content`, `embedding`, `position`).
+- `flashcards`, `flashcard_reviews` – spaced repetition data.
+- `tasks`, `pomodoro_sessions`, `note_versions` – still managed by the frontend/clients via Firestore.
+
+Populate them using the Firebase console/SDKs; the Express server only orchestrates the multi-step AI and review workflows.
+
+### Creating the schema
+
+1. **Enable Firestore + Storage** in the Firebase console (project `learningaier`). Choose *Start in production mode* so security rules guard every collection.
+2. **Create collections** with documents containing the fields referenced above. Example shapes:
+   - `folders/{id}` → `{ user_id, name, parent_id, sort_order, created_at, updated_at }`
+   - `notes/{id}` → `{ user_id, folder_id, title, content_md_zh, content_md_en, word_count, reading_time_seconds, auto_save_version, auto_saved_at, sort_order, created_at, updated_at }`
+   - `note_chunks/{id}` → `{ user_id, note_id, content, embedding: number[], position, created_at }`
+   - `documents/{id}` → `{ user_id, folder_id, title, file_path, created_at, updated_at }`
+3. **Indexes**: Firestore requires composite indexes for the ordered queries the frontend runs. Create them via the console (Indexes → Composite):
+   - `folders`: where `user_id ==` + order by `sort_order` ascending.
+   - `notes`: where `user_id ==` + order by `sort_order` ascending.
+   - `note_versions`: where `note_id ==` + order by `created_at` descending.
+   If you also query flashcards/reviews with filters, replicate those indexes (`user_id` + `next_due_at`, etc.).
+4. **Storage structure**: keep two logical folders in the default bucket (`learningaier.firebasestorage.app`):
+   - `documents/{uid}/<timestamp>-file.pdf`
+   - `note-assets/{uid}/<timestamp>-image.png`
+   The frontend writes into those prefixes and stores the resulting `file_path` on each Firestore document so backend routes (e.g., `/documents-upload-process`) can fetch and parse the files.
+
+## Frontend Coordination
+
+Frontend env files now expose Firebase + API keys:
+
+```
+VITE_FIREBASE_API_KEY=AIzaSyBC7tF0O651cNAyLyEJ25i2rPWVGQa9ICg
+VITE_FIREBASE_AUTH_DOMAIN=learningaier.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=learningaier
+VITE_FIREBASE_STORAGE_BUCKET=learningaier.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=330193246496
+VITE_FIREBASE_APP_ID=1:330193246496:web:a8c15c3f4dbeef60e8df45
+VITE_FIREBASE_MEASUREMENT_ID=G-ZB04YPVXMN
+VITE_API_BASE_URL=http://localhost:8787/functions/v1
 ```
 
-The script simply forwards to `npx supabase functions serve ... --env-file .env.<target>`, so you can set `SUPABASE_ENV_TARGET` in your shell if you prefer (`export SUPABASE_ENV_TARGET=prod`).
+Update the frontend auth/data layer to use Firebase SDKs and call the new Express endpoints via `VITE_API_BASE_URL`.
 
-### AI providers & embeddings
+## Legacy Supabase Artifacts
 
-- Google Gemini (`gemini-2.5-flash`) is the default LLM provider. Populate `LLM_API_KEY` inside `.env.local` / `.env.prod` with your Gemini key (the same key also powers embeddings).
-- Retrieval now relies on Google `text-embedding-004` trimmed to 1536 dimensions (to stay within pgvector's ANN index cap). Apply `0002_gemini_embeddings.sql` after the initial schema and then rerun `notes-reindex` for every note to store the resized embeddings.
-- Override providers/models per user via the `profiles` table as before; the backend automatically lowercases provider ids and routes requests to either OpenAI-compatible or Gemini clients.
-
-### Applying migrations / writing data
-
-- **Local stack**
-  ```bash
-  cd backend
-  npx supabase start               # spins up Docker services
-  npx supabase db reset            # rebuilds DB + runs migrations
-  ```
-- **Hosted project**
-  1. Escape-sensitive env vars in `.env.prod` already use single quotes, so you can safely load them:
-     ```bash
-     cd backend
-     set -a
-     source .env.prod
-     set +a
-     ```
-  2. Push migrations or run SQL using the remote Postgres URL:
-     ```bash
-     npx supabase db push --db-url "$POSTGRES_URL"
-     # or run seed scripts / psql with $POSTGRES_URL_NON_POOLING
-     ```
-  3. (Optional) Link the CLI to the hosted project once you’ve logged in:
-     ```bash
-     npx supabase login                       # obtain CLI access token
-     npx supabase link --project-ref beelemrsnwzdhsukiyuq
-     npx supabase db push                     # now targets the linked project
-     ```
-
-This lets you switch between local Docker and hosted Supabase by picking the env file and running the same CLI commands.
-
-## 1. Phased Roadmap
-
-| Phase | Focus | Deliverables |
-|-------|-------|--------------|
-| 0 | Supabase bootstrap | Connect project, enable `pgvector` (handled in migration). |
-| 1 | Schema & RLS | Tables for folders, notes, documents, note_chunks, flashcards, flashcard_reviews, tasks, pomodoro_sessions, profiles. |
-| 2 | Secure CRUD | RLS policies (already included) + RPC helpers if needed for pagination/multi-step operations. |
-| 3 | LLM Integration | `llmClient` abstraction, `/ai/notes/process`, `/ai/notes/terminology`. |
-| 4 | Chunking & Retrieval | Note chunking utility, embeddings pipeline, vector search RPC. |
-| 5 | Q&A Endpoint | `/ai/notes/qa` with scope resolution + strict-context prompt. |
-| 6 | PDF Processing | `/documents/upload/process` pipeline (Storage fetch → PDF parse → Note Processor). |
-| 7 | Spaced Repetition | Flashcard scheduling helper + `/flashcards/review` endpoint. |
-| 8 | Settings | Profiles CRUD + llmClient provider selection. |
-
-## 2. Database Schema Snapshot
-
-All SQL lives in `supabase/migrations/0001_init_schema.sql` and mirrors the canonical spec:
-
-- `profiles`: extends `auth.users` with display name + preferred LLM provider/model.
-- A trigger (`on_auth_user_created`) automatically inserts a blank `profiles` row on every new signup so frontend settings can rely on it existing.
-- **Auth storage**: Supabase credentials (email/password, metadata) live inside `auth.users` (managed by Supabase Auth, not the `public` schema). Use Supabase Studio → Authentication → Users or a service-role query (`select id,email from auth.users`) to inspect accounts. The `profiles` table only holds supplemental info we control, while the auth subsystem keeps password hashes and login state separate for security.
-- `folders`: hierarchical note/document containers (`parent_id` self-reference).
-- `documents`: uploaded PDFs stored in Supabase Storage (keeps `file_path` reference).
-- `notes`: bilingual Markdown content plus link to source document/folder.
-- `note_chunks`: pgvector-backed chunks for retrieval (embedding dimension 1536, IVFFlat index).
-- `flashcards` + `flashcard_reviews`: spaced repetition objects with bilingual fields and SM‑like scheduling metadata.
-- `tasks` + `pomodoro_sessions`: lightweight productivity helpers, linked back to study artifacts.
-
-Every table has row-level security enabled. Policies restrict records to `auth.uid()` (direct `user_id` match or correlated subquery for `note_chunks`). Update timestamps are managed via a shared `trigger_set_updated_at` function.
-
-## 3. Core System Prompts
-
-The prompt texts are defined programmatically in `src/llm/prompts.ts` to ensure every Edge Function references the same constants. Summary of the three contracts:
-
-1. **Note Processor** (`NOTE_PROCESSOR_PROMPT`)
-   - Input: arbitrary bilingual article text.
-   - Output: strict JSON with `language_input`, bilingual `summary`, bilingual hierarchical `bullet_notes`, and a terminology array (all fields mirrored in zh/en).
-2. **Terminology → Flashcards** (`TERMINOLOGY_PROMPT`)
-   - Input: note text (any mix of languages).
-   - Output: strict JSON `{ "terminology": [...] }` with bilingual term/definition/context values; no duplicates, focus on key concepts.
-3. **Strict-Context Q&A** (`QA_PROMPT`)
-   - Input: question + vetted `context_chunks[]`.
-   - Output: JSON containing detected answer language, bilingual answer pair, `used_context_ids`, `confidence`, and optional `notes`. Must refuse answers when evidence is insufficient (set `confidence = "low"`).
-
-See file for the full wording that instructs the LLM to respond with raw JSON (no Markdown) while supporting Chinese + English simultaneously.
-
-## 4. Public HTTP Contracts
-
-| Endpoint | Description | Payload | Response |
-|----------|-------------|---------|----------|
-| `POST /ai/notes/process` | Runs Note Processor over free-form text. | `{ "text": string }` | Note Processor JSON payload for use in the editor. |
-| `POST /ai/notes/terminology` | Extracts bilingual terminology/flashcards. | `{ "text": string }` | Terminology JSON; can be ingested into `flashcards`. |
-| `POST /ai/notes/qa` | Q&A limited to scoped notes/folders or full corpus. | `{ "question": string, "scope": { "type": "note" \| "folder" \| "all", "id"?: string } }` | Strict-context answer JSON, including `used_context_ids` + `confidence`. |
-| `POST /documents/upload/process` | Fetches a PDF by `document_id`, extracts text, produces draft notes and terminology. | `{ "document_id": string }` | `{ noteDraft, terminology, stats }` – see function file for structure. |
-| `POST /notes/:id/reindex` | Chunks & embeds bilingual markdown after edits. | `{ "note_id": string }` | `{ chunksProcessed, embeddingModel }`. |
-| `POST /flashcards/:id/review` | Applies spaced-repetition response, logs review, schedules next session. | `{ "flashcard_id": string, "response": "again" \| "hard" \| "good" \| "easy" }` | `{ next_due_at, interval_days }`. |
-
-Each Edge Function validates Supabase auth JWTs, scopes queries to `auth.uid()`, and logs structured errors.
-
-## 5. AI + Retrieval Workflow
-
-1. **PDF Upload**
-   1. Frontend uploads file to Supabase Storage → creates `documents` row.
-   2. Call `/documents/upload/process` to parse PDF and call Note Processor. User can edit resulting draft before saving the note.
-2. **Note Save**
-   1. Frontend writes `notes` row (native Supabase client).
-   2. Call `/notes/:id/reindex` to chunk bilingual markdown into balanced paragraphs/sentences and persist embeddings in `note_chunks`.
-3. **Retrieval + Q&A**
-   1. `/ai/notes/qa` resolves scope to a note/folder/all, filters `note_chunks` accordingly, and queries via `match_vectors` (vector cosine).
-   2. Selected chunks become `context_chunks` for QA prompt. Response returns bilingual answer + `used_context_ids`.
-4. **Flashcards**
-   1. Terminology arrays feed flashcard creation (optionally manual review).
-   2. `/flashcards/:id/review` logs review, maps SM‑like intervals (again=1 day, hard=2, good=4, easy=8 default for MVP), and updates `next_due_at`.
-5. **Pomodoro / Tasks**
-   - CRUD handled via Supabase client; backend ensures linking tasks to notes/docs/pomodori sessions for analytics.
-
-## 6. How Frontend Should Interact
-
-- **Direct Supabase client** for basic CRUD on tables covered by RLS.
-- **Edge Functions** whenever multi-step orchestration is required (LLM calls, chunking, PDF processing, scheduling).
-- **Configuring providers**: frontend writes desired `llm_provider` / `llm_model` into `profiles`. `llmClient` automatically picks them up or falls back to `env`.
-
-## 7. Next Steps
-
-1. Wire Supabase CLI project, run the migration, and deploy RLS policies.
-2. Implement the shared utilities + Edge Functions (see `src/` and `functions/` skeletons to fill in).
-3. Connect CI to lint/test Deno code and validate SQL formatting.
-
-Everything else in this backend directory should build directly on the spec documented above.
+The previous Supabase migrations and Edge Function source files (`backend/supabase`, `backend/functions`) are kept for reference only—they are no longer part of the runtime or deployment story.

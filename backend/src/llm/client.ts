@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "npm:@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 export interface LLMConfig {
   provider: string;

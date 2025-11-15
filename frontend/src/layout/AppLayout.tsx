@@ -105,7 +105,7 @@ export function AppLayout() {
               <Divider orientation="vertical" flexItem />
               <Stack spacing={0.5} alignItems="flex-end" sx={{ display: { xs: "none", sm: "flex" } }}>
                 <Typography variant="body2" fontWeight={600}>
-                  {user?.user_metadata?.full_name ?? user?.email ?? "User"}
+                  {user?.displayName ?? user?.email ?? "User"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {user?.email}

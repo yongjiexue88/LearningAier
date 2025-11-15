@@ -1,52 +1,73 @@
-import { PropsWithChildren, createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabaseClient";
+import {
+  PropsWithChildren,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updateProfile,
+  type User,
+} from "firebase/auth";
+import { firebaseAuth } from "../lib/firebaseClient";
 
 interface AuthContextValue {
-  session: Session | null;
   user: User | null;
   loading: boolean;
+  idToken: string | null;
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
   signIn: (credentials: { email: string; password: string }) => Promise<void>;
-  signUp: (payload: { email: string; password: string; fullName?: string }) => Promise<void>;
+  signUp: (payload: {
+    email: string;
+    password: string;
+    fullName?: string;
+  }) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [idToken, setIdToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true;
-    const init = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!active) return;
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
+    const unsubscribe = onIdTokenChanged(firebaseAuth, async (nextUser) => {
+      setUser(nextUser);
+      if (nextUser) {
+        const token = await nextUser.getIdToken();
+        setIdToken(token);
+      } else {
+        setIdToken(null);
+      }
       setLoading(false);
-    };
-    init();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
     });
-
     return () => {
-      active = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, []);
 
-  const signIn = async ({ email, password }: { email: string; password: string }) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      throw error;
-    }
+  const getIdToken = async (forceRefresh = false): Promise<string | null> => {
+    if (!firebaseAuth.currentUser) return null;
+    const token = await firebaseAuth.currentUser.getIdToken(forceRefresh);
+    setIdToken(token);
+    return token;
+  };
+
+  const signIn = async ({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) => {
+    await signInWithEmailAndPassword(firebaseAuth, email, password);
   };
 
   const signUp = async ({
@@ -58,35 +79,32 @@ export function AuthProvider({ children }: PropsWithChildren) {
     password: string;
     fullName?: string;
   }) => {
-    const { error } = await supabase.auth.signUp({
+    const credential = await createUserWithEmailAndPassword(
+      firebaseAuth,
       email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
-    });
-    if (error) {
-      throw error;
+      password
+    );
+    if (fullName) {
+      await updateProfile(credential.user, { displayName: fullName });
     }
+    await credential.user.getIdToken(true);
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      throw error;
-    }
+    await firebaseSignOut(firebaseAuth);
   };
 
   const value = useMemo(
     () => ({
-      session,
       user,
       loading,
+      idToken,
+      getIdToken,
       signIn,
       signUp,
       signOut,
     }),
-    [session, user, loading]
+    [user, loading, idToken]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
