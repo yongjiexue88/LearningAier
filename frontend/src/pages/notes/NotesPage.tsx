@@ -8,14 +8,11 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRightRounded";
 import MoreVertIcon from "@mui/icons-material/MoreVertRounded";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import RenameIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
-import SyncIcon from "@mui/icons-material/SyncRounded";
-import CompareIcon from "@mui/icons-material/CompareArrowsRounded";
 import TranslateIcon from "@mui/icons-material/GTranslate";
 import HistoryIcon from "@mui/icons-material/HistoryRounded";
 import SaveIcon from "@mui/icons-material/SaveRounded";
 import DuplicateIcon from "@mui/icons-material/ContentCopyRounded";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
-import ImageIcon from "@mui/icons-material/ImageRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
 import PreviewIcon from "@mui/icons-material/PreviewRounded";
 import RefreshIcon from "@mui/icons-material/RefreshRounded";
@@ -40,14 +37,12 @@ import {
   ListItemButton,
   ListItemText,
   Menu,
-  MenuItem,
   Paper,
   Snackbar,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Typography,
+  MenuItem,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -90,7 +85,6 @@ import {
 import {
   ref as storageRef,
   uploadBytes,
-  getDownloadURL,
 } from "firebase/storage";
 import {
   firebaseDb,
@@ -99,8 +93,8 @@ import {
 import { invokeFunction } from "../../lib/apiClient";
 
 const DOCUMENTS_BUCKET = "documents";
-const NOTE_ASSETS_BUCKET = "note-assets";
 const AUTO_HISTORY_INTERVAL_MS = 60_000;
+const AUTO_SAVE_INTERVAL_MS = 60_000;
 
 interface NoteListItem {
   id: string;
@@ -271,13 +265,6 @@ export function NotesPage() {
     name: string;
     parentId: string | null;
   }>({ mode: "create", open: false, name: "", parentId: null });
-  const [generateNotesDialog, setGenerateNotesDialog] = useState(false);
-  const [generateNotesInput, setGenerateNotesInput] = useState("");
-  const [translationDialog, setTranslationDialog] = useState<{
-    open: boolean;
-    diff: { heading: string; issue: string; details: string }[];
-    recommendations: string[];
-  }>({ open: false, diff: [], recommendations: [] });
   const [latestFlashcards, setLatestFlashcards] = useState<FlashcardRecord[]>(
     []
   );
@@ -295,6 +282,9 @@ export function NotesPage() {
   const markdownInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [askAIInput, setAskAIInput] = useState("");
   const [askAILoading, setAskAILoading] = useState(false);
+  const [translateMenuAnchor, setTranslateMenuAnchor] =
+    useState<HTMLElement | null>(null);
+  const [translateLoading, setTranslateLoading] = useState(false);
   const callFunction = useCallback(
     async <T,>(name: string, body: Record<string, unknown>): Promise<T> => {
       const token = await getIdToken();
@@ -472,7 +462,17 @@ export function NotesPage() {
       zh: noteDetail.content_md_zh ?? "",
       en: noteDetail.content_md_en ?? "",
     });
-    setLanguageTab(noteDetail.primary_language ?? "zh");
+    const preferredLanguage = noteDetail.primary_language ?? "zh";
+    const hasPreferredContent =
+      preferredLanguage === "zh"
+        ? Boolean(noteDetail.content_md_zh?.trim())
+        : Boolean(noteDetail.content_md_en?.trim());
+    const fallbackLanguage = noteDetail.content_md_zh?.trim()
+      ? "zh"
+      : noteDetail.content_md_en?.trim()
+      ? "en"
+      : preferredLanguage;
+    setLanguageTab(hasPreferredContent ? preferredLanguage : fallbackLanguage);
     setAutoSaveState("idle");
   }, [noteDetail?.id]);
 
@@ -584,7 +584,7 @@ export function NotesPage() {
         console.error(error);
         showSnackbar("Auto-save failed", "error");
       });
-    }, 2000);
+    }, AUTO_SAVE_INTERVAL_MS);
   }, [selectedNoteId, noteDraft, isDirty, saveNote, showSnackbar]);
 
   const handleCreateFolder = async () => {
@@ -767,82 +767,44 @@ export function NotesPage() {
     showSnackbar("Note moved");
   };
 
-  const handleTranslation = async (
-    mode: "translate" | "compare" | "sync",
-    targetLanguage: "zh" | "en"
-  ) => {
+  const handleTranslation = async (targetLanguage: "zh" | "en") => {
+    if (translateLoading) return;
     if (!selectedNoteId) {
       showSnackbar("Choose a note first", "info");
       return;
     }
-    const sourceLanguage = targetLanguage === "zh" ? "en" : "zh";
-    const sourceValue =
-      sourceLanguage === "zh" ? noteDraft.zh : noteDraft.en;
-    const targetValue =
-      targetLanguage === "zh" ? noteDraft.zh : noteDraft.en;
-    try {
-      const data = await callFunction<any>("ai-notes-translate", {
-        note_id: selectedNoteId,
-        mode,
-        source_language: sourceLanguage,
-        target_language: targetLanguage,
-        source_text: sourceValue,
-        target_text: targetValue,
-      });
-    if (mode === "compare") {
-      setTranslationDialog({
-        open: true,
-        diff: data.result.diff_summary,
-        recommendations: data.result.recommendations,
-      });
+    const sourceText = languageTab === "zh" ? noteDraft.zh : noteDraft.en;
+    if (!sourceText.trim()) {
+      showSnackbar("Nothing to translate yet", "info");
       return;
     }
-    if (targetLanguage === "zh") {
-      setNoteDraft((prev) => ({
-        ...prev,
-        zh: data.result.translated_markdown,
-      }));
-    } else {
-      setNoteDraft((prev) => ({
-        ...prev,
-        en: data.result.translated_markdown,
-      }));
-    }
-    showSnackbar(
-      mode === "sync" ? "Auto-sync applied" : "Translation ready",
-      "success"
-    );
-    if (mode === "sync") {
-      await saveNote("manual").catch((err) =>
-        showSnackbar(err.message, "error")
+    setTranslateLoading(true);
+    try {
+      const data = await callFunction<{ translated_markdown: string }>(
+        "ai-notes-translate",
+        {
+          note_id: selectedNoteId,
+          text: sourceText,
+          target_language: targetLanguage,
+        }
       );
-    }
+      setNoteDraft((prev) =>
+        targetLanguage === "zh"
+          ? { ...prev, zh: data.translated_markdown }
+          : { ...prev, en: data.translated_markdown }
+      );
+      setLanguageTab(targetLanguage);
+      showSnackbar(
+        `Translated to ${languageLabels[targetLanguage]}`,
+        "success"
+      );
     } catch (error: any) {
       showSnackbar(error?.message ?? "Translation failed", "error");
+    } finally {
+      setTranslateLoading(false);
     }
   };
 
-  const handleGenerateNotes = async () => {
-    if (!generateNotesInput.trim()) {
-      showSnackbar("Paste some source text first", "info");
-      return;
-    }
-    try {
-      const data = await callFunction<any>("ai-notes-process", {
-        text: generateNotesInput,
-      });
-      setNoteDraft((prev) => ({
-        ...prev,
-        zh: noteProcessorResultToMarkdown(data, "zh"),
-        en: noteProcessorResultToMarkdown(data, "en"),
-      }));
-      setGenerateNotesDialog(false);
-      setGenerateNotesInput("");
-      showSnackbar("Draft generated");
-    } catch (error: any) {
-      showSnackbar(error?.message ?? "Generation failed", "error");
-    }
-  };
 
   const handleFlashcards = async () => {
     if (!selectedNoteId) {
@@ -933,28 +895,6 @@ export function NotesPage() {
     const slug = slugify(noteDetail.title || "flashcards");
     saveAs(zip, `${slug}.apkg`);
     showSnackbar("Exported .apkg file", "success");
-  };
-
-  const handleImageUpload = async (file: File) => {
-    if (!userId) return;
-    try {
-      const path = `${NOTE_ASSETS_BUCKET}/${userId}/${Date.now()}-${
-        file.name
-      }`;
-      const refObj = storageRef(firebaseStorage, path);
-      await uploadBytes(refObj, file, {
-        cacheControl: "3600",
-      });
-      const url = await getDownloadURL(refObj);
-    const snippet = `![${file.name}](${url})`;
-    setNoteDraft((prev) =>
-      languageTab === "zh"
-        ? { ...prev, zh: `${prev.zh}\n\n${snippet}` }
-        : { ...prev, en: `${prev.en}\n\n${snippet}` }
-    );
-    } catch (error: any) {
-      showSnackbar(error?.message ?? "Image upload failed", "error");
-    }
   };
 
   const handlePdfDrop = async (file: File) => {
@@ -1340,13 +1280,6 @@ export function NotesPage() {
               useFlexGap
             >
               <Button
-                startIcon={<AutoAwesomeIcon />}
-                variant="outlined"
-                onClick={() => setGenerateNotesDialog(true)}
-              >
-                Generate Notes
-              </Button>
-              <Button
                 startIcon={<StyleIcon />}
                 variant="outlined"
                 onClick={handleFlashcards}
@@ -1362,55 +1295,14 @@ export function NotesPage() {
                 Ask AI
               </Button>
             </Stack>
-            <Tabs
-              value={languageTab}
-              onChange={(_event, value) => setLanguageTab(value)}
-              sx={{ borderBottom: 1, borderColor: "divider" }}
-            >
-              <Tab value="zh" label="Chinese" />
-              <Tab value="en" label="English" />
-            </Tabs>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button
                 startIcon={<TranslateIcon />}
-                onClick={() => handleTranslation("translate", "zh")}
+                variant="contained"
+                disabled={!selectedNoteId || translateLoading}
+                onClick={(event) => setTranslateMenuAnchor(event.currentTarget)}
               >
-                EN → ZH
-              </Button>
-              <Button
-                startIcon={<TranslateIcon />}
-                onClick={() => handleTranslation("translate", "en")}
-              >
-                ZH → EN
-              </Button>
-              <Button
-                startIcon={<CompareIcon />}
-                onClick={() => handleTranslation("compare", languageTab)}
-              >
-                Compare
-              </Button>
-              <Button
-                startIcon={<SyncIcon />}
-                onClick={() => handleTranslation("sync", languageTab)}
-              >
-                Auto-sync
-              </Button>
-              <Button
-                startIcon={<ImageIcon />}
-                component="label"
-              >
-                Insert image
-                <input
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void handleImageUpload(file);
-                    }
-                  }}
-                />
+                {translateLoading ? "Translating..." : "Translate"}
               </Button>
               <Button
                 startIcon={<CodeIcon />}
@@ -1435,6 +1327,24 @@ export function NotesPage() {
                 {showPreview ? "Hide preview" : "Live preview"}
               </Button>
             </Stack>
+            <Menu
+              anchorEl={translateMenuAnchor}
+              open={Boolean(translateMenuAnchor)}
+              onClose={() => setTranslateMenuAnchor(null)}
+            >
+              {(["zh", "en"] as const).map((lang) => (
+                <MenuItem
+                  key={lang}
+                  disabled={translateLoading}
+                  onClick={() => {
+                    setTranslateMenuAnchor(null);
+                    void handleTranslation(lang);
+                  }}
+                >
+                  Translate to {languageLabels[lang]}
+                </MenuItem>
+              ))}
+            </Menu>
             <Stack
               direction={{ xs: "column", lg: "row" }}
               spacing={2}
@@ -1453,7 +1363,7 @@ export function NotesPage() {
                       : { ...prev, en: value }
                   );
                 }}
-                placeholder={`Write ${languageLabels[languageTab]} markdown...`}
+                placeholder="Write your note in Markdown..."
                 inputRef={markdownInputRef}
                 InputProps={{
                   sx: { fontFamily: "JetBrains Mono, monospace" },
@@ -1593,80 +1503,6 @@ export function NotesPage() {
             disabled={folderDialogMutation.isPending}
           >
             Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={generateNotesDialog}
-        onClose={() => setGenerateNotesDialog(false)}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Generate Bilingual Notes</DialogTitle>
-        <DialogContent>
-          <TextField
-            multiline
-            minRows={8}
-            label="Paste source text"
-            fullWidth
-            value={generateNotesInput}
-            onChange={(event) => setGenerateNotesInput(event.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setGenerateNotesDialog(false)}>Cancel</Button>
-          <Button onClick={handleGenerateNotes} variant="contained">
-            Generate
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={translationDialog.open}
-        onClose={() =>
-          setTranslationDialog({ open: false, diff: [], recommendations: [] })
-        }
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Comparison summary</DialogTitle>
-        <DialogContent>
-          <Typography variant="subtitle2" gutterBottom>
-            Differences
-          </Typography>
-          <List dense>
-            {translationDialog.diff.map((item, index) => (
-              <ListItem key={`${item.heading}-${index}`}>
-                <ListItemText
-                  primary={`${item.issue.toUpperCase()}: ${item.heading}`}
-                  secondary={item.details}
-                />
-              </ListItem>
-            ))}
-          </List>
-          <Typography variant="subtitle2" gutterBottom>
-            Recommendations
-          </Typography>
-          <List dense>
-            {translationDialog.recommendations.map((item, index) => (
-              <ListItem key={index}>
-                <ListItemText primary={item} />
-              </ListItem>
-            ))}
-          </List>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() =>
-              setTranslationDialog({
-                open: false,
-                diff: [],
-                recommendations: [],
-              })
-            }
-          >
-            Close
           </Button>
         </DialogActions>
       </Dialog>

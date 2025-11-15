@@ -60,7 +60,6 @@ The server automatically loads `.env.<target>` based on `APP_ENV`/`NODE_ENV` (`l
 
 | Route | Purpose |
 | --- | --- |
-| `POST /ai-notes-process` | Generate bilingual note draft JSON from free-form text. |
 | `POST /ai-notes-translate` | Translate/sync a note between zh/en, optionally loading note content. |
 | `POST /ai-notes-terminology` | Extract bilingual terminology/flashcards from text. |
 | `POST /ai-notes-qa` | Strict-context Q&A with embeddings + RAG filtering. |
@@ -91,15 +90,21 @@ Populate them using the Firebase console/SDKs; the Express server only orchestra
    - `notes/{id}` → `{ user_id, folder_id, title, content_md_zh, content_md_en, word_count, reading_time_seconds, auto_save_version, auto_saved_at, sort_order, created_at, updated_at }`
    - `note_chunks/{id}` → `{ user_id, note_id, content, embedding: number[], position, created_at }`
    - `documents/{id}` → `{ user_id, folder_id, title, file_path, created_at, updated_at }`
-3. **Indexes**: Firestore requires composite indexes for the ordered queries the frontend runs. Create them via the console (Indexes → Composite):
-   - `folders`: where `user_id ==` + order by `sort_order` ascending.
-   - `notes`: where `user_id ==` + order by `sort_order` ascending.
-   - `note_versions`: where `note_id ==` + order by `created_at` descending.
-   If you also query flashcards/reviews with filters, replicate those indexes (`user_id` + `next_due_at`, etc.).
+3. **Indexes**: Firestore requires composite indexes for the ordered queries the frontend runs. The repo now includes `firestore.indexes.json` at the root. With the Firebase CLI installed, deploy them in one shot (covers `folders`, `notes`, `note_versions`, and `flashcard_reviews`):
+   ```bash
+   firebase deploy --only firestore:indexes --project learningaier
+   # or firebase firestore:indexes:apply firestore.indexes.json
+   ```
+   Prefer the CLI so you can version-control the definitions, but you can still create them manually via the console if needed (Indexes → Composite) using the same field pairs.
 4. **Storage structure**: keep two logical folders in the default bucket (`learningaier.firebasestorage.app`):
    - `documents/{uid}/<timestamp>-file.pdf`
    - `note-assets/{uid}/<timestamp>-image.png`
    The frontend writes into those prefixes and stores the resulting `file_path` on each Firestore document so backend routes (e.g., `/documents-upload-process`) can fetch and parse the files.
+
+### Troubleshooting
+
+- **Firestore missing index warnings (`user_id + sort_order`)** – deploy the composite indexes via `firestore.indexes.json` (see step 3 above) and wait for Firestore to finish building them. Once ready, the frontend will stop falling back to client-side sorting.
+- **`ai-notes-*` endpoints return HTTP 500** – the Gemini client now enforces JSON Schema output. Pull the latest backend code, ensure `LLM_API_KEY`, `DEFAULT_LLM_MODEL`, and related keys in `backend/.env.local` point to a live Gemini project, then restart `npm run dev`. If errors persist, watch the backend logs; the Express server will log the upstream Gemini error describing what to fix (invalid API key, quota, etc.).
 
 ## Frontend Coordination
 
@@ -117,6 +122,10 @@ VITE_API_BASE_URL=http://localhost:8787/functions/v1
 ```
 
 Update the frontend auth/data layer to use Firebase SDKs and call the new Express endpoints via `VITE_API_BASE_URL`.
+
+## TODO
+
+- Reintroduce the note editor image upload/insert flow (upload to Cloud Storage and inject a markdown image link).
 
 ## Legacy Supabase Artifacts
 

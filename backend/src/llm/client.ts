@@ -148,7 +148,7 @@ export class LLMClient {
           parts: [{ text: params.systemPrompt.trim() }],
         },
         responseMimeType: "application/json",
-        responseSchema: params.schema as any,
+        responseJsonSchema: params.schema,
         temperature: params.temperature ?? 0.2,
         maxOutputTokens: params.maxOutputTokens ?? 1024,
       },
