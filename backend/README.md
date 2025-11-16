@@ -123,6 +123,48 @@ VITE_API_BASE_URL=http://localhost:8787/functions/v1
 
 Update the frontend auth/data layer to use Firebase SDKs and call the new Express endpoints via `VITE_API_BASE_URL`.
 
+
+## Firebase Hosting deploy gotchas
+
+If Firebase Hosting isn’t showing your latest UI even though you ran a deploy, it’s usually one of these:
+
+1) You deployed without rebuilding  
+Firebase serves the built static files, not your dev server. Run:
+```bash
+npm run build
+firebase deploy --only hosting
+```
+after every frontend change.
+
+2) `firebase.json` points at the wrong folder  
+Your hosting config should point `public` to your build output (e.g. Vite/CRA `build`):
+```json
+{
+  "hosting": {
+    "public": "build",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}
+```
+Make sure that path matches your built assets, then rerun `npm run build && firebase deploy --only hosting`.
+
+3) Deployed to a different Firebase project  
+Check which project is active and deploy explicitly:
+```bash
+firebase projects:list
+firebase use
+firebase deploy --only hosting --project <project-id>
+```
+
+4) Browser / CDN cache  
+Hard refresh (Cmd/Ctrl+Shift+R), disable cache in DevTools, or try incognito/another browser.
+
+5) Preview channel vs live  
+The CLI prints both Preview and Hosting URLs. Open the live Hosting URL (e.g. `https://<project>.web.app`), not an old preview link.
+
+If you paste your `firebase.json` and exact deploy commands, it’s easy to pinpoint the mismatch.
+
 ## TODO
 
 - Reintroduce the note editor image upload/insert flow (upload to Cloud Storage and inject a markdown image link).
