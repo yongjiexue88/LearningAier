@@ -16,7 +16,6 @@ import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
 import PreviewIcon from "@mui/icons-material/PreviewRounded";
 import RefreshIcon from "@mui/icons-material/RefreshRounded";
-import TimerIcon from "@mui/icons-material/TimerRounded";
 import {
   Alert,
   Box,
@@ -43,6 +42,7 @@ import {
   TextField,
   Typography,
   MenuItem,
+  Tooltip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1155,10 +1155,14 @@ export function NotesPage() {
               borderRadius: 1,
               bgcolor:
                 selectedFolderId === node.id
-                  ? alpha("#1e6ad4", 0.1)
+                  ? alpha("#1e6ad4", 0.12)
                   : "transparent",
               cursor: "pointer",
               pl: `${node.depth * 16 + 8}px`,
+              borderLeft:
+                selectedFolderId === node.id ? "3px solid" : "3px solid transparent",
+              borderColor:
+                selectedFolderId === node.id ? "primary.main" : "transparent",
             }}
             onClick={() => setSelectedFolderId(node.id)}
           >
@@ -1262,61 +1266,84 @@ export function NotesPage() {
       )}
 
       <Stack spacing={2}>
-        <Paper sx={{ p: 2, display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="h6" flexGrow={1}>
-            Folders
-          </Typography>
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() =>
-              setFolderDialog({
-                mode: "create",
-                open: true,
-                name: "",
-                parentId: selectedFolderId,
-              })
-            }
-          >
-            New Folder
-          </Button>
-        </Paper>
-        <Paper sx={{ p: 1, minHeight: 320 }}>
-          {foldersQuery.isLoading ? (
-            <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
-              <CircularProgress size={24} />
-            </Stack>
-          ) : folderTree.length ? (
-            renderFolderNodes(folderTree)
-          ) : (
-            <Typography variant="body2" color="text.secondary">
-              Create folders to organize your bilingual notes.
+        <Paper sx={{ p: 2, borderRadius: 2, boxShadow: "0 6px 18px rgba(0,0,0,0.04)" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Folders
             </Typography>
-          )}
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() =>
+                setFolderDialog({
+                  mode: "create",
+                  open: true,
+                  name: "",
+                  parentId: selectedFolderId,
+                })
+              }
+            >
+              New folder
+            </Button>
+          </Stack>
+          <Divider sx={{ mb: 1 }} />
+          <Box sx={{ maxHeight: 360, overflow: "auto" }}>
+            {foldersQuery.isLoading ? (
+              <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
+                <CircularProgress size={24} />
+              </Stack>
+            ) : folderTree.length ? (
+              renderFolderNodes(folderTree)
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                Create folders to organize your notes.
+              </Typography>
+            )}
+          </Box>
         </Paper>
-        <Paper sx={{ p: 2 }}>
-          <Stack direction="row" alignItems="center" mb={1}>
-            <Typography variant="subtitle1" flexGrow={1}>
+        <Paper sx={{ p: 2, borderRadius: 2, boxShadow: "0 6px 18px rgba(0,0,0,0.04)" }}>
+          <Stack direction="row" alignItems="center" mb={1} spacing={1}>
+            <Typography variant="subtitle1" fontWeight={700} flexGrow={1}>
               Notes ({notesInFolder.length})
             </Typography>
             <IconButton
               size="small"
+              color="primary"
               onClick={() => createNoteMutation.mutate()}
             >
               <AddIcon fontSize="small" />
             </IconButton>
           </Stack>
-          <List dense>
+          <Divider sx={{ mb: 1 }} />
+          <List dense sx={{ maxHeight: 360, overflow: "auto" }}>
             {notesInFolder.map((note) => (
               <ListItemButton
                 key={note.id}
                 selected={note.id === selectedNoteId}
                 onClick={() => setSelectedNoteId(note.id)}
+                sx={{
+                  borderRadius: 1.5,
+                  mb: 0.5,
+                  alignItems: "flex-start",
+                  "&.Mui-selected": {
+                    backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                    borderLeft: "3px solid",
+                    borderColor: "primary.main",
+                  },
+                }}
               >
                 <ListItemText
-                  primary={note.title}
-                  secondary={`Updated ${new Date(
-                    note.updated_at
-                  ).toLocaleString()}`}
+                  primary={
+                    <Typography fontWeight={700} fontSize="0.95rem">
+                      {note.title}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography variant="body2" color="text.secondary">
+                      {note.word_count ?? 0} words
+                    </Typography>
+                  }
                 />
               </ListItemButton>
             ))}
@@ -1330,8 +1357,17 @@ export function NotesPage() {
       </Stack>
 
       <Stack spacing={2}>
-        <Paper sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
-          <Stack spacing={2}>
+        <Paper
+          sx={{
+            p: 3,
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            borderRadius: 2,
+            boxShadow: "0 8px 24px rgba(0,0,0,0.04)",
+          }}
+        >
+          <Stack spacing={1.5}>
             <Stack
               direction={{ xs: "column", md: "row" }}
               spacing={2}
@@ -1339,7 +1375,12 @@ export function NotesPage() {
             >
               <TextField
                 fullWidth
-                label="Note title"
+                placeholder="Untitled note"
+                variant="standard"
+                InputProps={{
+                  disableUnderline: false,
+                  sx: { fontSize: "1.6rem", fontWeight: 700 },
+                }}
                 value={noteDraft.title}
                 onChange={(event) =>
                   setNoteDraft((prev) => ({
@@ -1362,26 +1403,26 @@ export function NotesPage() {
                 ))}
               </TextField>
             </Stack>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="body2" color="text.secondary">
+                {noteDetail
+                  ? `Updated ${new Date(noteDetail.updated_at).toLocaleTimeString()}`
+                  : "Select a note"}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                •
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {noteDetail?.word_count ?? 0} words
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                •
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {formatReadingTime(noteDetail?.reading_time_seconds ?? 0)}
+              </Typography>
               <Chip
-                icon={<HistoryIcon />}
-                label={
-                  noteDetail
-                    ? `Updated ${new Date(
-                        noteDetail.updated_at
-                      ).toLocaleTimeString()}`
-                    : "Select a note"
-                }
-              />
-              <Chip
-                icon={<PreviewIcon />}
-                label={`${noteDetail?.word_count ?? 0} words`}
-              />
-              <Chip
-                icon={<TimerIcon />}
-                label={formatReadingTime(noteDetail?.reading_time_seconds ?? 0)}
-              />
-              <Chip
+                size="small"
                 color={
                   autoSaveState === "saving"
                     ? "warning"
@@ -1393,67 +1434,100 @@ export function NotesPage() {
                   autoSaveState === "saving"
                     ? "Saving..."
                     : autoSaveState === "saved"
-                    ? "All changes saved"
+                    ? "Saved"
                     : "Idle"
                 }
               />
-              <Button
-                startIcon={<SaveIcon />}
-                onClick={() => saveNote("manual")}
-                disabled={!isDirty}
-              >
-                Save now
-              </Button>
-              <Button
-                startIcon={<DuplicateIcon />}
-                onClick={() => duplicateNoteMutation.mutate()}
-                disabled={!noteDetail}
-              >
-                Duplicate
-              </Button>
-              <Button
-                startIcon={<HistoryIcon />}
-                onClick={() => setHistoryOpen(true)}
-                disabled={!noteDetail}
-              >
-                History
-              </Button>
-              <Button
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={() => selectedNoteId && deleteNoteMutation.mutate(selectedNoteId)}
-                disabled={!selectedNoteId}
-              >
-                Delete
-              </Button>
-              <Button
-                startIcon={<RefreshIcon />}
-                onClick={async () => {
-                  if (!selectedNoteId) return;
-                  try {
-                    await callFunction("notes-reindex", {
-                      note_id: selectedNoteId,
-                    });
-                    showSnackbar("Note reindexed", "success");
-                  } catch (error: any) {
-                    showSnackbar(error?.message ?? "Reindex failed", "error");
-                  }
-                }}
-                disabled={!selectedNoteId}
-              >
-                Reindex
-              </Button>
+              <Tooltip title="Save now (Cmd/Ctrl + S)">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => saveNote("manual")}
+                    disabled={!isDirty}
+                  >
+                    <SaveIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Duplicate note">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => duplicateNoteMutation.mutate()}
+                    disabled={!noteDetail}
+                  >
+                    <DuplicateIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Version history">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => setHistoryOpen(true)}
+                    disabled={!noteDetail}
+                  >
+                    <HistoryIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Delete note">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() =>
+                      selectedNoteId && deleteNoteMutation.mutate(selectedNoteId)
+                    }
+                    disabled={!selectedNoteId}
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Reindex note">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={async () => {
+                      if (!selectedNoteId) return;
+                      try {
+                        await callFunction("notes-reindex", {
+                          note_id: selectedNoteId,
+                        });
+                        showSnackbar("Note reindexed", "success");
+                      } catch (error: any) {
+                        showSnackbar(error?.message ?? "Reindex failed", "error");
+                      }
+                    }}
+                    disabled={!selectedNoteId}
+                  >
+                    <RefreshIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
             </Stack>
-            <Divider />
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={1}
-              flexWrap="wrap"
-              useFlexGap
-            >
+          </Stack>
+
+          <Box
+            sx={{
+              backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.03),
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 2,
+              p: 1.5,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1,
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button
                 startIcon={<StyleIcon />}
-                variant="outlined"
+                variant="contained"
                 onClick={handleFlashcards}
                 disabled={!selectedNoteId}
               >
@@ -1462,6 +1536,7 @@ export function NotesPage() {
               <Button
                 startIcon={<QuestionAnswerIcon />}
                 variant="contained"
+                color="secondary"
                 onClick={() => setChatOpen(true)}
               >
                 Ask AI
@@ -1470,7 +1545,7 @@ export function NotesPage() {
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button
                 startIcon={<TranslateIcon />}
-                variant="contained"
+                variant="outlined"
                 disabled={!selectedNoteId || translateLoading}
                 onClick={(event) => setTranslateMenuAnchor(event.currentTarget)}
               >
@@ -1485,6 +1560,7 @@ export function NotesPage() {
               </Button>
               <Button
                 startIcon={<CodeIcon />}
+                variant="outlined"
                 onClick={() => {
                   const language = prompt("Language (e.g., python, sql)") ?? "";
                   const snippet = `\n\`\`\`${language}\n// code here\n\`\`\`\n`;
@@ -1501,189 +1577,205 @@ export function NotesPage() {
                 {showPreview ? "Hide preview" : "Live preview"}
               </Button>
             </Stack>
-            <Menu
-              anchorEl={translateMenuAnchor}
-              open={Boolean(translateMenuAnchor)}
-              onClose={() => setTranslateMenuAnchor(null)}
-            >
-              {(["zh", "en"] as const).map((lang) => (
-                <MenuItem
-                  key={lang}
-                  disabled={translateLoading}
-                  onClick={() => {
-                    setTranslateMenuAnchor(null);
-                    void handleTranslation(lang);
-                  }}
-                >
-                  Translate to {languageLabels[lang]}
-                </MenuItem>
-              ))}
-            </Menu>
-            <Menu
-              anchorEl={styleMenuAnchor}
-              open={Boolean(styleMenuAnchor)}
-              onClose={() => setStyleMenuAnchor(null)}
-            >
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("heading1");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Heading 1 (#)
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("heading2");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Heading 2 (##)
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("heading3");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Heading 3 (###)
-              </MenuItem>
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("bold");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Bold (**)
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("italic");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Italic (*)
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("strike");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Strikethrough (~~)
-              </MenuItem>
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("bullet");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Bullet list
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("indent");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Indent
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  applyTextStyling("outdent");
-                  setStyleMenuAnchor(null);
-                }}
-              >
-                Outdent
-              </MenuItem>
-            </Menu>
-            <Stack
-              direction={{ xs: "column", lg: "row" }}
-              spacing={2}
-              alignItems="stretch"
-            >
-              <TextField
-                multiline
-                minRows={10}
-                fullWidth
+          </Box>
+
+          <Stack
+            direction={{ xs: "column", lg: "row" }}
+            spacing={2}
+            alignItems="stretch"
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              mx: 0,
+            }}
+          >
+            <TextField
+              multiline
+              minRows={10}
+              fullWidth
+              sx={{
+                flex: 1,
+                width: { xs: "100%", lg: showPreview ? "50%" : "100%" },
+                height: EDITOR_PANEL_HEIGHT,
+                "& .MuiInputBase-root": {
+                  height: "100%",
+                  alignItems: "flex-start",
+                  bgcolor: "background.paper",
+                  borderRadius: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  px: 1,
+                },
+                "& .MuiInputBase-input": {
+                  height: "100% !important",
+                  overflow: "auto",
+                  lineHeight: 1.7,
+                },
+              }}
+              value={noteDraft.content}
+              onChange={(event) => {
+                const value = event.target.value;
+                setNoteDraft((prev) => ({ ...prev, content: value }));
+              }}
+              placeholder="Write your note in Markdown..."
+              inputRef={markdownInputRef}
+              InputProps={{
+                sx: { fontFamily: "JetBrains Mono, monospace" },
+              }}
+            />
+            {showPreview && (
+              <Paper
+                variant="outlined"
                 sx={{
+                  p: 2,
                   flex: 1,
                   width: { xs: "100%", lg: "50%" },
                   height: EDITOR_PANEL_HEIGHT,
-                  "& .MuiInputBase-root": {
-                    height: "100%",
-                    alignItems: "flex-start",
-                  },
-                  "& .MuiInputBase-input": {
-                    height: "100% !important",
-                    overflow: "auto",
-                  },
+                  overflow: "auto",
+                  borderRadius: 2,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.04)",
                 }}
-                value={noteDraft.content}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setNoteDraft((prev) => ({ ...prev, content: value }));
-                }}
-                placeholder="Write your note in Markdown..."
-                inputRef={markdownInputRef}
-                InputProps={{
-                  sx: { fontFamily: "JetBrains Mono, monospace" },
-                }}
-              />
-              {showPreview && (
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    p: 2,
-                    flex: 1,
-                    width: { xs: "100%", lg: "50%" },
-                    height: EDITOR_PANEL_HEIGHT,
-                    overflow: "auto",
-                  }}
-                >
-                  <Box sx={markdownPreviewSx}>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                      components={markdownComponents as any}
-                    >
-                      {noteDraft.content}
-                    </ReactMarkdown>
-                  </Box>
-                </Paper>
-              )}
-            </Stack>
-            {!!headings.length && (
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Outline
-                </Typography>
-                <Stack spacing={0.5}>
-                  {headings.map((heading) => (
-                    <Typography
-                      key={heading.id}
-                      sx={{ pl: `${(heading.level - 1) * 12}px` }}
-                      variant="body2"
-                    >
-                      • {heading.text}
-                    </Typography>
-                  ))}
-                </Stack>
+              >
+                <Box sx={markdownPreviewSx}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={markdownComponents as any}
+                  >
+                    {noteDraft.content}
+                  </ReactMarkdown>
+                </Box>
               </Paper>
             )}
-            {uploadState.status !== "idle" && (
-              <LinearProgress
-                sx={{ borderRadius: 1 }}
-                variant={
-                  uploadState.status === "processing" ? "indeterminate" : "determinate"
-                }
-              />
-            )}
           </Stack>
+          {!!headings.length && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Outline
+              </Typography>
+              <Stack spacing={0.5}>
+                {headings.map((heading) => (
+                  <Typography
+                    key={heading.id}
+                    sx={{ pl: `${(heading.level - 1) * 12}px` }}
+                    variant="body2"
+                  >
+                    • {heading.text}
+                  </Typography>
+                ))}
+              </Stack>
+            </Paper>
+          )}
+          {uploadState.status !== "idle" && (
+            <LinearProgress
+              sx={{ borderRadius: 1 }}
+              variant={
+                uploadState.status === "processing" ? "indeterminate" : "determinate"
+              }
+            />
+          )}
         </Paper>
       </Stack>
+
+      <Menu
+        anchorEl={translateMenuAnchor}
+        open={Boolean(translateMenuAnchor)}
+        onClose={() => setTranslateMenuAnchor(null)}
+      >
+        {(["zh", "en"] as const).map((lang) => (
+          <MenuItem
+            key={lang}
+            disabled={translateLoading}
+            onClick={() => {
+              setTranslateMenuAnchor(null);
+              void handleTranslation(lang);
+            }}
+          >
+            Translate to {languageLabels[lang]}
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <Menu
+        anchorEl={styleMenuAnchor}
+        open={Boolean(styleMenuAnchor)}
+        onClose={() => setStyleMenuAnchor(null)}
+      >
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("heading1");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Heading 1 (#)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("heading2");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Heading 2 (##)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("heading3");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Heading 3 (###)
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("bold");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Bold (**)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("italic");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Italic (*)
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("strike");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Strikethrough (~~)
+        </MenuItem>
+        <Divider />
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("bullet");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Bullet list
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("indent");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Indent
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            applyTextStyling("outdent");
+            setStyleMenuAnchor(null);
+          }}
+        >
+          Outdent
+        </MenuItem>
+      </Menu>
 
       <Menu
         anchorEl={folderMenu.anchor}

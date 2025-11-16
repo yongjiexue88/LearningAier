@@ -15,6 +15,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import SettingsIcon from "@mui/icons-material/SettingsRounded";
 import { useMemo, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar, SidebarContent } from "./Sidebar";
@@ -71,15 +72,16 @@ export function AppLayout() {
       <Box component="section" sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
         <AppBar
           position="sticky"
-          elevation={0}
+          elevation={1}
           color="inherit"
           sx={{
             borderBottom: "1px solid",
             borderColor: "divider",
             backgroundColor: "background.paper",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.03)",
           }}
         >
-          <Toolbar sx={{ gap: 2 }}>
+          <Toolbar sx={{ gap: 2, minHeight: 72 }}>
             <IconButton
               color="inherit"
               edge="start"
@@ -88,32 +90,42 @@ export function AppLayout() {
             >
               <MenuIcon />
             </IconButton>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                Welcome back
-              </Typography>
-              <Typography variant="h6" fontWeight={600}>
-                Study Assistant
-              </Typography>
+            <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center", gap: 1 }}>
+              <Box>
+                <Typography variant="h6" fontWeight={700}>
+                  Study Assistant
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Bilingual AI-powered study workspace
+                </Typography>
+              </Box>
             </Box>
-            <Stack direction="row" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center">
               <Tooltip title="Notifications">
                 <IconButton color="default">
                   <NotificationsIcon />
                 </IconButton>
               </Tooltip>
               <Divider orientation="vertical" flexItem />
-              <Stack spacing={0.5} alignItems="flex-end" sx={{ display: { xs: "none", sm: "flex" } }}>
-                <Typography variant="body2" fontWeight={600}>
-                  {user?.displayName ?? user?.email ?? "User"}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {user?.email}
-                </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ cursor: "pointer" }}
+                onClick={handleMenuOpen}
+              >
+                <Avatar sx={{ bgcolor: "primary.main", width: 40, height: 40 }}>
+                  {initials}
+                </Avatar>
+                <Stack spacing={0} sx={{ display: { xs: "none", sm: "flex" } }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    {user?.displayName ?? user?.email ?? "User"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {user?.email}
+                  </Typography>
+                </Stack>
               </Stack>
-              <IconButton onClick={handleMenuOpen}>
-                <Avatar sx={{ bgcolor: "primary.main" }}>{initials}</Avatar>
-              </IconButton>
               <Menu
                 anchorEl={anchorEl}
                 open={Boolean(anchorEl)}
@@ -121,8 +133,21 @@ export function AppLayout() {
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
               >
-                <MenuItem disabled>{user?.email}</MenuItem>
+                <MenuItem disabled dense>
+                  <Stack>
+                    <Typography variant="body2" fontWeight={700}>
+                      {user?.displayName ?? "Account"}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {user?.email}
+                    </Typography>
+                  </Stack>
+                </MenuItem>
                 <Divider />
+                <MenuItem onClick={handleMenuClose}>
+                  <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
+                  Account settings
+                </MenuItem>
                 <MenuItem onClick={handleSignOut}>
                   <LogoutIcon fontSize="small" sx={{ mr: 1 }} />
                   Sign out
