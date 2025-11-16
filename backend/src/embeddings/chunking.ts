@@ -14,6 +14,15 @@ const DEFAULT_OPTIONS: Required<ChunkOptions> = {
   overlap: 120,
 };
 
+export function chunkMarkdown(
+  content: string,
+  options: ChunkOptions = {}
+): Chunk[] {
+  const config = { ...DEFAULT_OPTIONS, ...options };
+  let position = 0;
+  return chunkSingleLanguage(content, "mixed", config, () => position++);
+}
+
 export function chunkBilingualMarkdown(
   content: { zh?: string; en?: string },
   options: ChunkOptions = {}
@@ -22,15 +31,21 @@ export function chunkBilingualMarkdown(
   const buffers: Chunk[] = [];
   let position = 0;
 
-  if (content.zh) {
+  const zh = content.zh?.trim() ?? "";
+  const en = content.en?.trim() ?? "";
+
+  const addChunks = (value: string, language: Chunk["language"]) => {
+    if (!value) return;
     buffers.push(
-      ...chunkSingleLanguage(content.zh, "zh", config, () => position++)
+      ...chunkSingleLanguage(value, language, config, () => position++)
     );
-  }
-  if (content.en) {
-    buffers.push(
-      ...chunkSingleLanguage(content.en, "en", config, () => position++)
-    );
+  };
+
+  if (zh && en && zh === en) {
+    addChunks(zh, "mixed");
+  } else {
+    addChunks(zh, "zh");
+    addChunks(en, "en");
   }
 
   return buffers.sort((a, b) => a.position - b.position);
@@ -38,7 +53,7 @@ export function chunkBilingualMarkdown(
 
 function chunkSingleLanguage(
   text: string,
-  language: "zh" | "en",
+  language: "zh" | "en" | "mixed",
   options: Required<ChunkOptions>,
   nextPosition: () => number
 ): Chunk[] {

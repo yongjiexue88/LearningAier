@@ -3,7 +3,7 @@ import { asyncHandler } from "../../middleware/asyncHandler";
 import type { AuthenticatedRequest } from "../../middleware/auth";
 import { BadRequestError, UnauthorizedError } from "../../errors";
 import { getNoteById, replaceNoteChunks } from "../../services/firestore";
-import { chunkBilingualMarkdown } from "../../embeddings/chunking";
+import { chunkMarkdown } from "../../embeddings/chunking";
 import { embedTexts } from "../../services/embeddings";
 import { runtimeConfig } from "../../config/runtime";
 
@@ -29,10 +29,8 @@ export function registerNotesReindexRoute(router: Router): void {
         throw new UnauthorizedError();
       }
 
-      const chunks = chunkBilingualMarkdown({
-        zh: note.content_md_zh ?? "",
-        en: note.content_md_en ?? "",
-      });
+      const content = note.content_md_en ?? note.content_md_zh ?? "";
+      const chunks = chunkMarkdown(content);
 
       if (!chunks.length) {
         throw new BadRequestError("Note has no content to index.");

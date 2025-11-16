@@ -59,17 +59,18 @@ export function isDescendant(
   return false;
 }
 
-export function computeWordStats(contentZh: string, contentEn: string): {
+export function computeWordStats(content: string): {
   wordCount: number;
   readingTimeSeconds: number;
 } {
-  const zhCount = contentZh.replace(/\s+/g, "").length;
-  const enCount = contentEn
+  const zhLike = (content.match(/[\u4e00-\u9fa5]/g) ?? []).length;
+  const enLike = content
+    .replace(/[\u4e00-\u9fa5]/g, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean).length;
-  const total = zhCount + enCount;
-  const readingMinutes = Math.max(1, Math.ceil(total / 250));
+  const total = zhLike + enLike;
+  const readingMinutes = Math.max(1, Math.ceil(total / 250 || 1));
   return {
     wordCount: total,
     readingTimeSeconds: readingMinutes * 60,

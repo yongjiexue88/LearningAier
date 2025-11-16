@@ -262,7 +262,7 @@ You are the Study Assistant flashcard generator.
 Input: bilingual markdown for a study note plus optional metadata.
 Goals:
 1. Extract the most important concepts/terms/snippets.
-2. Produce concise Q/A flashcards in both Chinese & English.
+2. Produce concise flashcards with a single term/definition/context (no language split).
 3. Assign each flashcard to one of: "vocabulary", "concept", "code", "definition".
 4. Provide a short cite (heading or bullet) showing where the answer originated.
 
@@ -271,9 +271,9 @@ Output JSON only:
   "flashcards": [
     {
       "category": "vocabulary" | "concept" | "code" | "definition",
-      "question": { "zh": "string", "en": "string" },
-      "answer": { "zh": "string", "en": "string" },
-      "context": { "zh": "string|null", "en": "string|null" },
+      "term": "string",
+      "definition": "string",
+      "context": "string|null",
       "source_heading": "string|null"
     }
   ],
@@ -281,8 +281,7 @@ Output JSON only:
 }
 
 Rules:
-- Keep answers <= 2 sentences. Prefer parallel bilingual phrasing.
-- For "code" cards, include the language in the question (e.g., "Python 示例").
+- Keep definitions <= 2 sentences.
 - Only emit high-value cards (max 24).`;
 
 export const NOTE_FLASHCARD_SCHEMA = {
@@ -293,40 +292,97 @@ export const NOTE_FLASHCARD_SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        required: ["category", "question", "answer"],
+        required: ["category", "term", "definition"],
         properties: {
           category: {
             type: "string",
             enum: ["vocabulary", "concept", "code", "definition"],
           },
-          question: {
-            type: "object",
-            required: ["zh", "en"],
-            properties: {
-              zh: { type: "string" },
-              en: { type: "string" },
-            },
-          },
-          answer: {
-            type: "object",
-            required: ["zh", "en"],
-            properties: {
-              zh: { type: "string" },
-              en: { type: "string" },
-            },
-          },
-          context: {
-            type: "object",
-            required: ["zh", "en"],
-            properties: {
-              zh: { type: ["string", "null"] },
-              en: { type: ["string", "null"] },
-            },
-          },
+          term: { type: "string" },
+          definition: { type: "string" },
+          context: { type: ["string", "null"] },
           source_heading: { type: ["string", "null"] },
         },
       },
     },
     summary: { type: ["string", "null"] },
+  },
+};
+
+export const NOTE_FLASHCARD_KEYWORDS_PROMPT = `
+You are Gemini, a bilingual flashcard keyword hunter.
+Input: bilingual markdown for a note.
+Goal: list the most teachable terms or concepts that should become flashcards.
+
+Return JSON only:
+{
+  "keywords": [
+    { "term": "string", "category": "vocabulary" | "concept" | "code" | "definition", "reason": "string" }
+  ]
+}
+
+Rules:
+- Prefer high-yield concepts, key vocabulary, definitions, and code ideas.
+- Cap at max_terms terms (default 16). Order by importance.
+- Do not include duplicates; keep names concise.`;
+
+export const NOTE_FLASHCARD_KEYWORDS_SCHEMA = {
+  type: "object",
+  required: ["keywords"],
+  properties: {
+    keywords: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["term", "category", "reason"],
+        properties: {
+          term: { type: "string" },
+          category: {
+            type: "string",
+            enum: ["vocabulary", "concept", "code", "definition"],
+          },
+          reason: { type: "string" },
+        },
+      },
+    },
+  },
+};
+
+export const NOTE_FLASHCARD_CARD_PROMPT = `
+You are Gemini, a bilingual flashcard maker.
+Given a note plus one target term, write a concise flashcard (single language block).
+
+Return JSON only:
+{
+  "flashcard": {
+    "term": "string",
+    "definition": "string",
+    "context": "string|null",
+    "category": "vocabulary" | "concept" | "code" | "definition"
+  }
+}
+
+Rules:
+- Keep definition <= 2 sentences.
+- Context is an optional short cite (heading, bullet, or source snippet).
+- Preserve the provided category when it fits; otherwise pick the closest one.`;
+
+export const NOTE_FLASHCARD_CARD_SCHEMA = {
+  type: "object",
+  required: ["flashcard"],
+  properties: {
+    flashcard: {
+      type: "object",
+      required: ["term", "definition", "category"],
+      properties: {
+        term: { type: "string" },
+        definition: { type: "string" },
+        context: { type: ["string", "null"] },
+        category: {
+          type: "string",
+          enum: ["vocabulary", "concept", "code", "definition"],
+        },
+      },
+    },
   },
 };

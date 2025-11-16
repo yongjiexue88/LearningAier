@@ -37,7 +37,7 @@ export interface NoteData {
   title: string;
   content_md_zh?: string | null;
   content_md_en?: string | null;
-  primary_language: "zh" | "en";
+  primary_language?: "zh" | "en" | "generic" | null;
   source_doc_id?: string | null;
   sort_order?: number;
   word_count?: number;
@@ -85,6 +85,18 @@ export interface FlashcardReviewData {
   interval_days: number;
 }
 export type FlashcardReviewRecord = FlashcardReviewData & { id: string };
+
+export interface FlashcardGenerationLogData {
+  user_id: string;
+  note_id: string;
+  status: "success" | "preview" | "empty" | "error";
+  message: string;
+  candidate_count: number;
+  generated_count: number;
+  saved_count: number;
+  created_at?: string;
+}
+export type FlashcardGenerationLogRecord = FlashcardGenerationLogData & { id: string };
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -318,4 +330,17 @@ export async function updateFlashcard(
   await col<FlashcardData>("flashcards")
     .doc(flashcardId)
     .update({ ...data, updated_at: nowIso() });
+}
+
+export async function createFlashcardGenerationLog(
+  data: FlashcardGenerationLogData
+): Promise<FlashcardGenerationLogRecord> {
+  const collection = col<FlashcardGenerationLogData>("flashcard_generation_logs");
+  const ref = collection.doc();
+  const payload: FlashcardGenerationLogData = {
+    ...data,
+    created_at: data.created_at ?? nowIso(),
+  };
+  await ref.set(payload);
+  return { id: ref.id, ...payload };
 }

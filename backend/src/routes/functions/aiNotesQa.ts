@@ -89,18 +89,37 @@ async function generateGeminiResponse({
         ]
       : [{ role: "user", parts: [{ text: question }] }];
 
-  const response = await aiClient.models.generateContent({
-    model: runtimeConfig.defaultLLMModel,
-    contents,
-    config: {
-      temperature: 0.3,
-      maxOutputTokens: 1024,
-    },
-  });
+  try {
+    const response = await aiClient.models.generateContent({
+      model: runtimeConfig.defaultLLMModel,
+      contents,
+      config: {
+        temperature: 0.3,
+        maxOutputTokens: 1024,
+      },
+    });
 
-  const text = response.text?.trim();
-  if (!text) {
-    throw new Error("Gemini returned an empty response");
+    const text =
+      response.text?.trim() ||
+      response.candidates
+        ?.map((candidate) =>
+          candidate.content?.parts
+            ?.map((part) => (part as any)?.text ?? "")
+            .join("\n")
+            .trim()
+        )
+        .find((val) => Boolean(val)) ||
+      "";
+
+    if (text) {
+      return text;
+    }
+  } catch (error: any) {
+    console.error("[ai-notes-qa] Gemini call failed", {
+      message: error?.message,
+      stack: error?.stack,
+    });
   }
-  return text;
+
+  return "I couldn't generate an answer this time. Please try again in a moment or rephrase your question.";
 }

@@ -154,9 +154,17 @@ export class LLMClient {
       },
     });
 
-    const text = response.text;
+    const text =
+      typeof response.response?.text === "function"
+        ? response.response.text()
+        : undefined;
     if (typeof text !== "string" || !text.trim()) {
-      throw new Error("Gemini response missing text content");
+      const fallback =
+        response.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (!fallback || typeof fallback !== "string") {
+        throw new Error("Gemini response missing text content");
+      }
+      return JSON.parse(fallback) as T;
     }
 
     try {

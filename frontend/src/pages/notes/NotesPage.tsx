@@ -1,5 +1,4 @@
 import AddIcon from "@mui/icons-material/AddRounded";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeRounded";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswerRounded";
 import StyleIcon from "@mui/icons-material/StyleRounded";
 import FolderIcon from "@mui/icons-material/FolderRounded";
@@ -11,6 +10,7 @@ import RenameIcon from "@mui/icons-material/DriveFileRenameOutlineRounded";
 import TranslateIcon from "@mui/icons-material/GTranslate";
 import HistoryIcon from "@mui/icons-material/HistoryRounded";
 import SaveIcon from "@mui/icons-material/SaveRounded";
+import FormatListBulletedIcon from "@mui/icons-material/FormatListBulletedRounded";
 import DuplicateIcon from "@mui/icons-material/ContentCopyRounded";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
@@ -48,6 +48,7 @@ import { alpha } from "@mui/material/styles";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useAuth } from "../../providers/AuthProvider";
@@ -95,6 +96,71 @@ import { invokeFunction } from "../../lib/apiClient";
 const DOCUMENTS_BUCKET = "documents";
 const AUTO_HISTORY_INTERVAL_MS = 60_000;
 const AUTO_SAVE_INTERVAL_MS = 60_000;
+const EDITOR_PANEL_HEIGHT = { xs: "60vh", lg: "66vh" };
+
+const markdownPreviewSx = {
+  "& h1": { fontSize: "1.8rem", fontWeight: 700, marginTop: 24, marginBottom: 8 },
+  "& h2": { fontSize: "1.6rem", fontWeight: 700, marginTop: 20, marginBottom: 8 },
+  "& h3": { fontSize: "1.4rem", fontWeight: 700, marginTop: 16, marginBottom: 6 },
+  "& h4": { fontSize: "1.2rem", fontWeight: 700, marginTop: 14, marginBottom: 6 },
+  "& h5": { fontSize: "1.1rem", fontWeight: 700, marginTop: 12, marginBottom: 4 },
+  "& h6": { fontSize: "1rem", fontWeight: 700, marginTop: 10, marginBottom: 4 },
+  "& p": { marginBlock: 1, lineHeight: 1.6 },
+  "& hr": {
+    border: 0,
+    borderTop: (theme: any) => `1px solid ${theme.palette.divider}`,
+    marginBlock: 2,
+  },
+  "& strong": { fontWeight: 700 },
+  "& em": { fontStyle: "italic" },
+  "& del": { textDecoration: "line-through" },
+  "& a": {
+    color: (theme: any) => theme.palette.primary.main,
+    textDecoration: "underline",
+    textDecorationThickness: "from-font",
+  },
+  "& ul, & ol": { paddingLeft: 24, marginBlock: 1.25 },
+  "& li": { marginTop: 4, lineHeight: 1.5 },
+  "& blockquote": {
+    margin: "14px 0",
+    padding: "12px 16px",
+    borderLeft: (theme: any) => `4px solid ${theme.palette.divider}`,
+    backgroundColor: (theme: any) => alpha(theme.palette.text.primary, 0.04),
+    color: (theme: any) => theme.palette.text.secondary,
+    borderRadius: 8,
+  },
+  "& code": {
+    fontFamily: "JetBrains Mono, monospace",
+    backgroundColor: (theme: any) => alpha(theme.palette.text.primary, 0.08),
+    padding: "2px 6px",
+    borderRadius: 6,
+    fontSize: "0.95em",
+  },
+  "& pre": {
+    backgroundColor: (theme: any) => alpha(theme.palette.text.primary, 0.06),
+    padding: "12px 14px",
+    borderRadius: 10,
+    overflowX: "auto",
+    fontFamily: "JetBrains Mono, monospace",
+    fontSize: "0.95em",
+    border: (theme: any) => `1px solid ${theme.palette.divider}`,
+  },
+  "& pre code": { backgroundColor: "transparent", padding: 0 },
+  "& img": { maxWidth: "100%", display: "block", margin: "12px 0", borderRadius: 8 },
+  "& table": {
+    borderCollapse: "collapse",
+    width: "100%",
+    marginBlock: 2,
+    "& th, & td": {
+      border: (theme: any) => `1px solid ${theme.palette.divider}`,
+      padding: "8px 10px",
+      textAlign: "left",
+    },
+    "& th": {
+      backgroundColor: (theme: any) => alpha(theme.palette.text.primary, 0.05),
+    },
+  },
+};
 
 interface NoteListItem {
   id: string;
@@ -105,13 +171,14 @@ interface NoteListItem {
   word_count: number;
   reading_time_seconds: number;
   auto_save_version: number;
+  sort_order: number;
 }
 
 interface NoteDetail extends NoteListItem {
   content_md_zh: string | null;
   content_md_en: string | null;
   auto_saved_at: string | null;
-  primary_language: "zh" | "en";
+  primary_language?: "zh" | "en" | "generic" | null;
 }
 
 interface NoteVersion {
@@ -119,7 +186,7 @@ interface NoteVersion {
   note_id: string;
   created_at: string;
   snapshot_reason: "auto" | "manual" | "restore" | "system";
-  language_tab: "zh" | "en";
+  language_tab?: "zh" | "en" | "generic" | null;
   title: string;
   content_md_zh: string | null;
   content_md_en: string | null;
@@ -221,8 +288,7 @@ function mapNoteVersionDoc(
 
 type NoteDraftState = {
   title: string;
-  zh: string;
-  en: string;
+  content: string;
 };
 
 export function NotesPage() {
@@ -232,11 +298,9 @@ export function NotesPage() {
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [languageTab, setLanguageTab] = useState<"zh" | "en">("zh");
   const [noteDraft, setNoteDraft] = useState<NoteDraftState>({
     title: "",
-    zh: "",
-    en: "",
+    content: "",
   });
   const [showPreview, setShowPreview] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -285,6 +349,9 @@ export function NotesPage() {
   const [translateMenuAnchor, setTranslateMenuAnchor] =
     useState<HTMLElement | null>(null);
   const [translateLoading, setTranslateLoading] = useState(false);
+  const [styleMenuAnchor, setStyleMenuAnchor] = useState<HTMLElement | null>(
+    null
+  );
   const callFunction = useCallback(
     async <T,>(name: string, body: Record<string, unknown>): Promise<T> => {
       const token = await getIdToken();
@@ -457,22 +524,14 @@ export function NotesPage() {
 
   useEffect(() => {
     if (!noteDetail) return;
+    const contentFromNote =
+      noteDetail.content_md_en ??
+      noteDetail.content_md_zh ??
+      "";
     setNoteDraft({
       title: noteDetail.title,
-      zh: noteDetail.content_md_zh ?? "",
-      en: noteDetail.content_md_en ?? "",
+      content: contentFromNote,
     });
-    const preferredLanguage = noteDetail.primary_language ?? "zh";
-    const hasPreferredContent =
-      preferredLanguage === "zh"
-        ? Boolean(noteDetail.content_md_zh?.trim())
-        : Boolean(noteDetail.content_md_en?.trim());
-    const fallbackLanguage = noteDetail.content_md_zh?.trim()
-      ? "zh"
-      : noteDetail.content_md_en?.trim()
-      ? "en"
-      : preferredLanguage;
-    setLanguageTab(hasPreferredContent ? preferredLanguage : fallbackLanguage);
     setAutoSaveState("idle");
   }, [noteDetail?.id]);
 
@@ -486,17 +545,17 @@ export function NotesPage() {
 
   const isDirty = useMemo(() => {
     if (!noteDetail) return false;
+    const persistedContent =
+      noteDetail.content_md_en ?? noteDetail.content_md_zh ?? "";
     return (
       noteDraft.title !== (noteDetail.title ?? "") ||
-      noteDraft.zh !== (noteDetail.content_md_zh ?? "") ||
-      noteDraft.en !== (noteDetail.content_md_en ?? "")
+      noteDraft.content !== persistedContent
     );
   }, [noteDraft, noteDetail]);
 
   const headings = useMemo(() => {
-    const content = languageTab === "zh" ? noteDraft.zh : noteDraft.en;
-    return extractHeadings(content);
-  }, [languageTab, noteDraft]);
+    return extractHeadings(noteDraft.content);
+  }, [noteDraft.content]);
 
   const notesInFolder = useMemo(() => {
     if (!selectedFolderId) return [];
@@ -519,15 +578,111 @@ export function NotesPage() {
     }
   }, [queryClient, selectedNoteId]);
 
+  type TextStyleAction =
+    | "indent"
+    | "outdent"
+    | "bullet"
+    | "heading1"
+    | "heading2"
+    | "heading3"
+    | "bold"
+    | "italic"
+    | "strike";
+
+  const applyTextStyling = useCallback(
+    (action: TextStyleAction) => {
+      const textarea = markdownInputRef.current;
+      if (!textarea) return;
+      const value = noteDraft.content;
+      const selectionStart = textarea.selectionStart ?? 0;
+      const selectionEnd = textarea.selectionEnd ?? 0;
+      const isInline =
+        action === "bold" || action === "italic" || action === "strike";
+      if (isInline) {
+        const wrapper =
+          action === "bold" ? "**" : action === "italic" ? "*" : "~~";
+        let start = selectionStart;
+        let end = selectionEnd;
+        if (start === end) {
+          const before = value.slice(0, start);
+          const after = value.slice(end);
+          const leftMatch = before.match(/[\S]+$/);
+          const rightMatch = after.match(/^[\S]+/);
+          start = leftMatch ? start - leftMatch[0].length : start;
+          end = rightMatch ? end + rightMatch[0].length : end;
+        }
+        const selectedText = value.slice(start, end) || "text";
+        const nextValue =
+          value.slice(0, start) + wrapper + selectedText + wrapper + value.slice(end);
+        setNoteDraft((prev) => ({ ...prev, content: nextValue }));
+        requestAnimationFrame(() => {
+          const cursorStart = start + wrapper.length;
+          const cursorEnd = cursorStart + selectedText.length;
+          textarea.focus();
+          textarea.setSelectionRange(cursorStart, cursorEnd);
+        });
+        return;
+      }
+
+      const lineStart = value.lastIndexOf("\n", Math.max(selectionStart - 1, 0)) + 1;
+      const nextLineBreak = value.indexOf("\n", Math.max(selectionEnd, selectionStart));
+      const lineEnd = nextLineBreak === -1 ? value.length : nextLineBreak;
+      const before = value.slice(0, lineStart);
+      const target = value.slice(lineStart, lineEnd);
+      const after = value.slice(lineEnd);
+
+      const transformLine = (line: string) => {
+        switch (action) {
+          case "indent":
+            return `  ${line}`;
+          case "outdent":
+            return line.replace(/^(?: {1,2}|\t)/, "");
+          case "bullet": {
+            const trimmed = line.trimStart();
+            const withoutBullet = trimmed.replace(/^([-*+]|\d+\.)\s+/, "");
+            return `- ${withoutBullet}`;
+          }
+          case "heading1":
+          case "heading2":
+          case "heading3": {
+            const level = action === "heading1" ? 1 : action === "heading2" ? 2 : 3;
+            const cleaned = line.trimStart().replace(/^#{1,6}\s+/, "");
+            return `${"#".repeat(level)} ${cleaned || "Heading"}`.trimEnd();
+          }
+          default:
+            return line;
+        }
+      };
+
+      const updatedBlock = target
+        .split("\n")
+        .map((line) => transformLine(line))
+        .join("\n");
+      const nextValue = before + updatedBlock + after;
+      setNoteDraft((prev) => ({ ...prev, content: nextValue }));
+
+      requestAnimationFrame(() => {
+        const newEnd = lineStart + updatedBlock.length;
+        textarea.focus();
+        textarea.setSelectionRange(lineStart, newEnd);
+      });
+    },
+    [noteDraft.content]
+  );
+
   const saveNote = useCallback(
-    async (reason: "auto" | "manual" | "restore" = "manual") => {
+    async (
+      reason: "auto" | "manual" | "restore" = "manual",
+      draftOverride?: NoteDraftState
+    ) => {
       if (!selectedNoteId || !userId) return;
       setAutoSaveState("saving");
-      const stats = computeWordStats(noteDraft.zh, noteDraft.en);
+      const draft = draftOverride ?? noteDraft;
+      const stats = computeWordStats(draft.content);
       await updateDoc(doc(firebaseDb, "notes", selectedNoteId), {
-        title: noteDraft.title.trim() || "Untitled note",
-        content_md_zh: noteDraft.zh,
-        content_md_en: noteDraft.en,
+        title: draft.title.trim() || "Untitled note",
+        content_md_zh: draft.content,
+        content_md_en: draft.content,
         word_count: stats.wordCount,
         reading_time_seconds: stats.readingTimeSeconds,
         auto_saved_at: new Date().toISOString(),
@@ -543,10 +698,9 @@ export function NotesPage() {
         await addDoc(collection(firebaseDb, "note_versions"), {
           note_id: selectedNoteId,
           user_id: userId,
-          title: noteDraft.title,
-          content_md_zh: noteDraft.zh,
-          content_md_en: noteDraft.en,
-          language_tab: languageTab,
+          title: draft.title,
+          content_md_zh: draft.content,
+          content_md_en: draft.content,
           snapshot_reason: reason,
           metadata: {
             word_count: stats.wordCount,
@@ -568,10 +722,23 @@ export function NotesPage() {
       noteDraft,
       noteDetail?.auto_save_version,
       invalidateNotes,
-      languageTab,
       historyOpen,
       queryClient,
     ]
+  );
+
+  const restoreVersion = useCallback(
+    async (version: NoteVersion) => {
+      const restoredDraft: NoteDraftState = {
+        title: version.title,
+        content: version.content_md_en ?? version.content_md_zh ?? "",
+      };
+      setNoteDraft(restoredDraft);
+      await saveNote("restore", restoredDraft);
+      showSnackbar("Version restored", "success");
+      setHistoryOpen(false);
+    },
+    [saveNote, showSnackbar]
   );
 
   useEffect(() => {
@@ -635,7 +802,7 @@ export function NotesPage() {
         title: "Untitled note",
         folder_id: selectedFolderId,
         user_id: userId,
-        primary_language: "zh",
+        primary_language: "generic",
         content_md_zh: "",
         content_md_en: "",
         word_count: 0,
@@ -674,13 +841,15 @@ export function NotesPage() {
         throw new Error("Nothing to duplicate");
       }
       const now = new Date().toISOString();
+      const duplicatedContent =
+        noteDetail.content_md_en ?? noteDetail.content_md_zh ?? "";
       const docRef = await addDoc(collection(firebaseDb, "notes"), {
         title: `${noteDetail.title} (Copy)`,
         folder_id: noteDetail.folder_id,
         user_id: userId,
-        primary_language: noteDetail.primary_language,
-        content_md_zh: noteDetail.content_md_zh,
-        content_md_en: noteDetail.content_md_en,
+        primary_language: "generic",
+        content_md_zh: duplicatedContent,
+        content_md_en: duplicatedContent,
         word_count: noteDetail.word_count,
         reading_time_seconds: noteDetail.reading_time_seconds,
         auto_save_version: noteDetail.auto_save_version,
@@ -773,7 +942,7 @@ export function NotesPage() {
       showSnackbar("Choose a note first", "info");
       return;
     }
-    const sourceText = languageTab === "zh" ? noteDraft.zh : noteDraft.en;
+    const sourceText = noteDraft.content;
     if (!sourceText.trim()) {
       showSnackbar("Nothing to translate yet", "info");
       return;
@@ -788,12 +957,10 @@ export function NotesPage() {
           target_language: targetLanguage,
         }
       );
-      setNoteDraft((prev) =>
-        targetLanguage === "zh"
-          ? { ...prev, zh: data.translated_markdown }
-          : { ...prev, en: data.translated_markdown }
-      );
-      setLanguageTab(targetLanguage);
+      setNoteDraft((prev) => ({
+        ...prev,
+        content: data.translated_markdown,
+      }));
       showSnackbar(
         `Translated to ${languageLabels[targetLanguage]}`,
         "success"
@@ -818,7 +985,12 @@ export function NotesPage() {
       setLatestFlashcards(data.flashcards ?? []);
       setFlashcardDialogOpen(true);
       showSnackbar(`Generated ${data.flashcards?.length ?? 0} flashcards`);
+      console.info("[notes] flashcard generation success", {
+        noteId: selectedNoteId,
+        generated: data.flashcards?.length ?? 0,
+      });
     } catch (error: any) {
+      console.error("[notes] flashcard generation failed", error);
       showSnackbar(error?.message ?? "Flashcard generation failed", "error");
     }
   };
@@ -834,7 +1006,7 @@ export function NotesPage() {
         : { type: "all" };
     const nextHistory: ConversationMessage[] = [
       ...chatHistory,
-      { role: "user", content: askAIInput, language: languageTab },
+      { role: "user", content: askAIInput },
     ];
     setChatMessages((prev) => [
       ...prev,
@@ -842,7 +1014,6 @@ export function NotesPage() {
         id: crypto.randomUUID(),
         role: "user",
         content: askAIInput,
-        language: languageTab,
       },
     ]);
     setAskAIInput("");
@@ -922,10 +1093,11 @@ export function NotesPage() {
         document_id: docRef.id,
       });
       setUploadState({ status: "idle" });
+      const extractedEn = noteProcessorResultToMarkdown(data.noteDraft, "en");
+      const extractedZh = noteProcessorResultToMarkdown(data.noteDraft, "zh");
       setNoteDraft({
         title: file.name,
-        zh: noteProcessorResultToMarkdown(data.noteDraft, "zh"),
-        en: noteProcessorResultToMarkdown(data.noteDraft, "en"),
+        content: extractedEn || extractedZh,
       });
       showSnackbar("PDF extracted into editor", "success");
     } catch (error: any) {
@@ -1305,16 +1477,18 @@ export function NotesPage() {
                 {translateLoading ? "Translating..." : "Translate"}
               </Button>
               <Button
+                startIcon={<FormatListBulletedIcon />}
+                variant="outlined"
+                onClick={(event) => setStyleMenuAnchor(event.currentTarget)}
+              >
+                Text styling
+              </Button>
+              <Button
                 startIcon={<CodeIcon />}
                 onClick={() => {
                   const language = prompt("Language (e.g., python, sql)") ?? "";
                   const snippet = `\n\`\`\`${language}\n// code here\n\`\`\`\n`;
-                  const key = languageTab === "zh" ? "zh" : "en";
-                  setNoteDraft((prev) =>
-                    key === "zh"
-                      ? { ...prev, zh: prev.zh + snippet }
-                      : { ...prev, en: prev.en + snippet }
-                  );
+                  setNoteDraft((prev) => ({ ...prev, content: prev.content + snippet }));
                 }}
               >
                 Code block
@@ -1345,6 +1519,86 @@ export function NotesPage() {
                 </MenuItem>
               ))}
             </Menu>
+            <Menu
+              anchorEl={styleMenuAnchor}
+              open={Boolean(styleMenuAnchor)}
+              onClose={() => setStyleMenuAnchor(null)}
+            >
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("heading1");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Heading 1 (#)
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("heading2");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Heading 2 (##)
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("heading3");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Heading 3 (###)
+              </MenuItem>
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("bold");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Bold (**)
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("italic");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Italic (*)
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("strike");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Strikethrough (~~)
+              </MenuItem>
+              <Divider />
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("bullet");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Bullet list
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("indent");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Indent
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  applyTextStyling("outdent");
+                  setStyleMenuAnchor(null);
+                }}
+              >
+                Outdent
+              </MenuItem>
+            </Menu>
             <Stack
               direction={{ xs: "column", lg: "row" }}
               spacing={2}
@@ -1352,16 +1606,25 @@ export function NotesPage() {
             >
               <TextField
                 multiline
-                minRows={16}
+                minRows={10}
                 fullWidth
-                value={languageTab === "zh" ? noteDraft.zh : noteDraft.en}
+                sx={{
+                  flex: 1,
+                  width: { xs: "100%", lg: "50%" },
+                  height: EDITOR_PANEL_HEIGHT,
+                  "& .MuiInputBase-root": {
+                    height: "100%",
+                    alignItems: "flex-start",
+                  },
+                  "& .MuiInputBase-input": {
+                    height: "100% !important",
+                    overflow: "auto",
+                  },
+                }}
+                value={noteDraft.content}
                 onChange={(event) => {
                   const value = event.target.value;
-                  setNoteDraft((prev) =>
-                    languageTab === "zh"
-                      ? { ...prev, zh: value }
-                      : { ...prev, en: value }
-                  );
+                  setNoteDraft((prev) => ({ ...prev, content: value }));
                 }}
                 placeholder="Write your note in Markdown..."
                 inputRef={markdownInputRef}
@@ -1374,17 +1637,21 @@ export function NotesPage() {
                   variant="outlined"
                   sx={{
                     p: 2,
+                    flex: 1,
                     width: { xs: "100%", lg: "50%" },
-                    maxHeight: 480,
+                    height: EDITOR_PANEL_HEIGHT,
                     overflow: "auto",
                   }}
                 >
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={markdownComponents as any}
-                  >
-                    {languageTab === "zh" ? noteDraft.zh : noteDraft.en}
-                  </ReactMarkdown>
+                  <Box sx={markdownPreviewSx}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw]}
+                      components={markdownComponents as any}
+                    >
+                      {noteDraft.content}
+                    </ReactMarkdown>
+                  </Box>
                 </Paper>
               )}
             </Stack>
@@ -1553,17 +1820,11 @@ export function NotesPage() {
               {noteVersions.map((version) => (
                 <ListItemButton
                   key={version.id}
-                  onClick={() => {
-                    setNoteDraft({
-                      title: version.title,
-                      zh: version.content_md_zh ?? "",
-                      en: version.content_md_en ?? "",
-                    });
-                    setLanguageTab(version.language_tab);
-                    saveNote("restore").catch((error) =>
+                  onClick={() =>
+                    restoreVersion(version).catch((error) =>
                       showSnackbar(error.message, "error")
-                    );
-                  }}
+                    )
+                  }
                 >
                   <ListItemText
                     primary={`${new Date(version.created_at).toLocaleString()} (${version.snapshot_reason})`}

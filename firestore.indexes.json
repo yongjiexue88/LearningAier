@@ -25,10 +25,26 @@
       ]
     },
     {
+      "collectionGroup": "flashcards",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
+        { "fieldPath": "next_due_at", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "flashcard_reviews",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "flashcard_id", "order": "ASCENDING" },
+        { "fieldPath": "reviewed_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "flashcard_reviews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "user_id", "order": "ASCENDING" },
         { "fieldPath": "reviewed_at", "order": "DESCENDING" }
       ]
     }

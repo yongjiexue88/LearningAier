@@ -4,22 +4,30 @@ import type { AuthenticatedRequest } from "../../middleware/auth";
 import { BadRequestError, UnauthorizedError } from "../../errors";
 import {
   createFlashcards,
+  createFlashcardGenerationLog,
   getNoteById,
 } from "../../services/firestore";
 import { generateUserJSON } from "../../services/llm";
 import {
-  NOTE_FLASHCARD_PROMPT,
-  NOTE_FLASHCARD_SCHEMA,
+  NOTE_FLASHCARD_KEYWORDS_PROMPT,
+  NOTE_FLASHCARD_KEYWORDS_SCHEMA,
+  NOTE_FLASHCARD_CARD_PROMPT,
+  NOTE_FLASHCARD_CARD_SCHEMA,
 } from "../../llm/prompts";
 
 type FlashcardCategory = "vocabulary" | "concept" | "code" | "definition";
 
-interface FlashcardLLMItem {
+interface FlashcardKeywordLLMItem {
+  term: string;
   category: FlashcardCategory;
-  question: { zh: string; en: string };
-  answer: { zh: string; en: string };
-  context?: { zh?: string | null; en?: string | null };
-  source_heading?: string | null;
+  reason: string;
+}
+
+interface FlashcardCardLLMItem {
+  term: string;
+  definition: string;
+  context: string | null;
+  category: FlashcardCategory;
 }
 
 export function registerAiFlashcardsGenerateRoute(router: Router): void {
@@ -44,81 +52,204 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
         throw new UnauthorizedError();
       }
 
-      const categories = Array.isArray(payload.categories)
-        ? (payload.categories.filter((cat: unknown): cat is FlashcardCategory =>
-            cat === "vocabulary" ||
-            cat === "concept" ||
-            cat === "code" ||
-            cat === "definition"
-          ))
-        : undefined;
+      const logPrefix = `[ai-flashcards-generate][user=${userId}][note=${note.id}]`;
 
-      const maxCards = Math.min(Math.max(payload.max_cards ?? 16, 4), 32);
-      const llmResult = await generateUserJSON<{
-        flashcards: FlashcardLLMItem[];
-        summary?: string | null;
-      }>({
-        userId,
-        systemPrompt: NOTE_FLASHCARD_PROMPT,
-        userPrompt: JSON.stringify({
+      try {
+        const categories = Array.isArray(payload.categories)
+          ? (payload.categories.filter((cat: unknown): cat is FlashcardCategory =>
+              cat === "vocabulary" ||
+              cat === "concept" ||
+              cat === "code" ||
+              cat === "definition"
+            ))
+          : undefined;
+
+        const maxCards = Math.min(Math.max(payload.max_cards ?? 16, 4), 32);
+        const combinedText = note.content_md_en ?? note.content_md_zh ?? "";
+        const keywordUserPrompt = JSON.stringify({
           note_title: note.title,
-          text_zh: note.content_md_zh ?? "",
-          text_en: note.content_md_en ?? "",
-          max_cards: maxCards,
+          note_text: combinedText,
+          max_terms: maxCards,
           categories,
-        }),
-        schemaName: "NoteFlashcardResult",
-        schema: NOTE_FLASHCARD_SCHEMA,
-      });
+        });
+        console.info(`${logPrefix} requesting keywords`, {
+          maxCards,
+          categories,
+          promptPreview: keywordUserPrompt.slice(0, 200),
+          textLength: combinedText.length,
+        });
+        const keywordResult = await generateUserJSON<{
+          keywords: FlashcardKeywordLLMItem[];
+        }>({
+          userId,
+          systemPrompt: NOTE_FLASHCARD_KEYWORDS_PROMPT,
+          userPrompt: keywordUserPrompt,
+          schemaName: "NoteFlashcardKeywordsResult",
+          schema: NOTE_FLASHCARD_KEYWORDS_SCHEMA,
+        });
 
-      const llmCards = (llmResult.flashcards ?? []).filter((card) => {
-        if (!categories || categories.length === 0) return true;
-        return categories.includes(card.category);
-      });
-      const limitedCards = llmCards.slice(0, maxCards);
+        const keywords = (keywordResult.keywords ?? []).filter((kw) => {
+          if (!categories || categories.length === 0) return true;
+          return categories.includes(kw.category);
+        });
 
-      if (!limitedCards.length) {
+        const dedupedKeywords: FlashcardKeywordLLMItem[] = [];
+        const seen = new Set<string>();
+        for (const kw of keywords) {
+          const key = (kw.term ?? "").toLowerCase().trim();
+          if (key.trim() === "" || seen.has(key)) continue;
+          seen.add(key);
+          dedupedKeywords.push(kw);
+        }
+
+        const limitedKeywords = dedupedKeywords.slice(0, maxCards);
+        const cardResults: FlashcardCardLLMItem[] = [];
+
+        for (const kw of limitedKeywords) {
+          try {
+            console.info(`${logPrefix} generating card`, {
+              term: kw.term,
+              category: kw.category,
+            });
+            const cardResult = await generateUserJSON<{ flashcard: FlashcardCardLLMItem }>({
+              userId,
+              systemPrompt: NOTE_FLASHCARD_CARD_PROMPT,
+              userPrompt: JSON.stringify({
+                note_title: note.title,
+                note_text: combinedText,
+                term: kw.term,
+                category: kw.category,
+                reason: kw.reason,
+              }),
+              schemaName: "NoteFlashcardCardResult",
+              schema: NOTE_FLASHCARD_CARD_SCHEMA,
+            });
+            const card = cardResult.flashcard;
+            cardResults.push({
+              category: card.category,
+              term: card.term,
+              definition: card.definition,
+              context: card.context,
+            });
+            console.info(`${logPrefix} card created`, {
+              term: card.term,
+              category: card.category,
+              contextPreview: (card.context ?? "")?.slice(0, 120),
+            });
+          } catch (error: any) {
+            console.error("[ai-flashcards-generate] card generation failed", {
+              userId,
+              noteId: note.id,
+              term: kw.term,
+              error: error?.message ?? String(error),
+            });
+          }
+        }
+
+        console.info(`${logPrefix} keyword summary`, {
+          keywords: limitedKeywords.map((kw) => kw.term),
+          generated: cardResults.length,
+        });
+
+        const limitedCards = cardResults.slice(0, maxCards);
+
+        const limitedRecords = limitedCards.map((card) => ({
+          category: card.category,
+          term_zh: card.term,
+          term_en: card.term,
+          definition_zh: card.definition,
+          definition_en: card.definition,
+          context_zh: card.context,
+          context_en: card.context,
+        }));
+
+        if (!limitedRecords.length) {
+          await createFlashcardGenerationLog({
+            user_id: userId,
+            note_id: note.id,
+            status: "empty",
+            message: "No flashcards generated",
+            candidate_count: keywords.length,
+            generated_count: 0,
+            saved_count: 0,
+          });
+          res.json({
+            note_id: note.id,
+            flashcards: [],
+            saved_count: 0,
+            summary: null,
+          });
+          return;
+        }
+
+        const persist = payload.persist !== false;
+        if (!persist) {
+          await createFlashcardGenerationLog({
+            user_id: userId,
+            note_id: note.id,
+            status: "preview",
+            message: "Generated flashcards (preview only)",
+            candidate_count: keywords.length,
+            generated_count: limitedRecords.length,
+            saved_count: 0,
+          });
+          res.json({
+            note_id: note.id,
+            flashcards: limitedRecords,
+            saved_count: 0,
+            summary: null,
+          });
+          return;
+        }
+
+        const records = limitedRecords.map((card) => ({
+          user_id: userId,
+          note_id: note.id,
+          document_id: note.source_doc_id ?? null,
+          term_zh: card.term_zh,
+          term_en: card.term_en,
+          definition_zh: card.definition_zh,
+          definition_en: card.definition_en,
+          context_zh: card.context_zh ?? null,
+          context_en: card.context_en ?? null,
+          category: card.category as FlashcardCategory,
+        }));
+
+        const created = await createFlashcards(records);
+
+        await createFlashcardGenerationLog({
+          user_id: userId,
+          note_id: note.id,
+          status: "success",
+          message: `Generated ${created.length} flashcards`,
+          candidate_count: keywords.length,
+          generated_count: limitedCards.length,
+          saved_count: created.length,
+        });
+
         res.json({
           note_id: note.id,
-          flashcards: [],
-          saved_count: 0,
-          summary: llmResult.summary ?? null,
+          flashcards: created,
+          saved_count: created.length,
+          summary: null,
         });
-        return;
-      }
-
-      const persist = payload.persist !== false;
-      if (!persist) {
-        res.json({
+      } catch (error: any) {
+        console.error("[ai-flashcards-generate] failed", {
+          userId,
+          noteId: note.id,
+          error: error?.message ?? String(error),
+        });
+        await createFlashcardGenerationLog({
+          user_id: userId,
           note_id: note.id,
-          flashcards: limitedCards,
+          status: "error",
+          message: error?.message ?? "Unknown flashcard generation error",
+          candidate_count: 0,
+          generated_count: 0,
           saved_count: 0,
-          summary: llmResult.summary ?? null,
         });
-        return;
+        throw error;
       }
-
-      const records = limitedCards.map((card) => ({
-        user_id: userId,
-        note_id: note.id,
-        document_id: note.source_doc_id ?? null,
-        term_zh: card.question.zh,
-        term_en: card.question.en,
-        definition_zh: card.answer.zh,
-        definition_en: card.answer.en,
-        context_zh: card.context?.zh ?? card.source_heading ?? null,
-        context_en: card.context?.en ?? card.source_heading ?? null,
-        category: card.category,
-      }));
-
-      const created = await createFlashcards(records);
-
-      res.json({
-        note_id: note.id,
-        flashcards: created,
-        saved_count: created.length,
-        summary: llmResult.summary ?? null,
-      });
     })
   );
 }
