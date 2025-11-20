@@ -63,6 +63,7 @@ export interface FlashcardData {
   user_id: string;
   note_id?: string | null;
   document_id?: string | null;
+  set_id?: string | null;
   term_zh?: string | null;
   term_en?: string | null;
   definition_zh: string;
@@ -94,9 +95,24 @@ export interface FlashcardGenerationLogData {
   candidate_count: number;
   generated_count: number;
   saved_count: number;
+  set_id?: string | null;
+  model?: string | null;
   created_at?: string;
 }
 export type FlashcardGenerationLogRecord = FlashcardGenerationLogData & { id: string };
+
+export interface FlashcardSetData {
+  user_id: string;
+  note_id?: string | null;
+  name?: string | null;
+  source?: "note" | "manual";
+  model?: string | null;
+  provider?: string | null;
+  flashcard_ids: string[];
+  created_at?: string;
+  updated_at?: string;
+}
+export type FlashcardSetRecord = FlashcardSetData & { id: string };
 
 export function nowIso(): string {
   return new Date().toISOString();
@@ -303,6 +319,7 @@ export async function createFlashcards(
     const ref = collection.doc();
     const payload: FlashcardData = {
       ...record,
+      set_id: record.set_id ?? null,
       next_due_at: record.next_due_at ?? null,
       created_at: now,
       updated_at: now,
@@ -343,4 +360,28 @@ export async function createFlashcardGenerationLog(
   };
   await ref.set(payload);
   return { id: ref.id, ...payload };
+}
+
+export async function createFlashcardSet(
+  data: FlashcardSetData
+): Promise<FlashcardSetRecord> {
+  const collection = col<FlashcardSetData>("flashcard_sets");
+  const ref = collection.doc();
+  const payload: FlashcardSetData = {
+    ...data,
+    flashcard_ids: data.flashcard_ids ?? [],
+    created_at: data.created_at ?? nowIso(),
+    updated_at: data.updated_at ?? nowIso(),
+  };
+  await ref.set(payload);
+  return { id: ref.id, ...payload };
+}
+
+export async function updateFlashcardSet(
+  setId: string,
+  data: Partial<FlashcardSetData>
+): Promise<void> {
+  await col<FlashcardSetData>("flashcard_sets")
+    .doc(setId)
+    .update({ ...data, updated_at: nowIso() });
 }

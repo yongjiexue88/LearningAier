@@ -7,6 +7,7 @@ import { registerDocumentsUploadProcessRoute } from "./documentsUploadProcess";
 import { registerNotesReindexRoute } from "./notesReindex";
 import { registerFlashcardsReviewRoute } from "./flashcardsReview";
 import { registerAiFlashcardsGenerateRoute } from "./aiFlashcardsGenerate";
+import { registerFlashcardsSaveSelectedRoute } from "./flashcardsSaveSelected";
 
 export function createFunctionsRouter(): Router {
   const router = Router();
@@ -19,6 +20,7 @@ export function createFunctionsRouter(): Router {
   registerNotesReindexRoute(router);
   registerFlashcardsReviewRoute(router);
   registerAiFlashcardsGenerateRoute(router);
+  registerFlashcardsSaveSelectedRoute(router);
 
   return router;
 }

@@ -31,10 +31,7 @@ const workspaceItems = [
   { label: "Documents", icon: <DocumentIcon />, to: "/documents" },
 ];
 
-const toolItems = [
-  { label: "Pomodoro & Tasks", icon: <PomodoroIcon />, to: "/pomodoro" },
-  { label: "Settings", icon: <SettingsIcon />, to: "/settings" },
-];
+const toolItems = [{ label: "Pomodoro & Tasks", icon: <PomodoroIcon />, to: "/pomodoro" }];
 
 interface SidebarContentProps {
   collapsed?: boolean;
@@ -137,43 +134,43 @@ export function SidebarContent({
               Tools
             </Typography>
           )}
-            <List disablePadding>
-              {toolItems.map((item) => (
-                <ListItemButton
-                  key={item.to}
-                  component={NavLink}
-                  to={item.to}
-                  onClick={onNavigate}
-                  sx={{
-                    borderRadius: 10,
-                    px: collapsed ? 0.5 : 1.5,
-                    mt: 0.5,
-                    "& .MuiListItemIcon-root": {
-                      color: "text.secondary",
-                    },
-                    "&.active": {
+          <List disablePadding>
+            {toolItems.map((item) => (
+              <ListItemButton
+                key={item.to}
+                component={NavLink}
+                to={item.to}
+                onClick={onNavigate}
+                sx={{
+                  borderRadius: 10,
+                  px: collapsed ? 0.5 : 1.5,
+                  mt: 0.5,
+                  "& .MuiListItemIcon-root": {
+                    color: "text.secondary",
+                  },
+                  "&.active": {
                     backgroundColor: "action.hover",
                     "& .MuiListItemIcon-root": {
                       color: "primary.main",
                     },
-                    },
-                  }}
-                >
-                  <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 0.5 }}>
-                    {item.icon}
-                  </ListItemIcon>
-                  {!collapsed && (
-                    <ListItemText
-                      primaryTypographyProps={{
-                        fontWeight: 600,
-                        fontSize: "0.95rem",
-                      }}
-                      primary={item.label}
-                    />
-                  )}
-                </ListItemButton>
-              ))}
-            </List>
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 0.5 }}>
+                  {item.icon}
+                </ListItemIcon>
+                {!collapsed && (
+                  <ListItemText
+                    primaryTypographyProps={{
+                      fontWeight: 600,
+                      fontSize: "0.95rem",
+                    }}
+                    primary={item.label}
+                  />
+                )}
+              </ListItemButton>
+            ))}
+          </List>
         </Box>
       </Stack>
 
@@ -223,6 +220,17 @@ export function SidebarContent({
             </Stack>
           </MenuItem>
           <Divider />
+          <MenuItem
+            component={NavLink}
+            to="/settings"
+            onClick={() => {
+              setAccountAnchor(null);
+              onNavigate?.();
+            }}
+          >
+            <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
+            Settings
+          </MenuItem>
           <MenuItem
             onClick={() => {
               setAccountAnchor(null);

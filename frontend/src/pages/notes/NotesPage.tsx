@@ -21,6 +21,7 @@ import {
   Box,
   Button,
   Chip,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -198,6 +199,9 @@ interface NoteVersion {
 
 interface FlashcardRecord {
   id: string;
+  set_id?: string | null;
+  note_id?: string | null;
+  document_id?: string | null;
   term_zh: string | null;
   term_en: string | null;
   definition_zh: string;
@@ -207,6 +211,17 @@ interface FlashcardRecord {
   category: string;
   created_at: string;
 }
+
+interface ProfileRecord {
+  id: string;
+  llm_provider?: string | null;
+  llm_model?: string | null;
+}
+
+type GeneratedFlashcard = Omit<FlashcardRecord, "id" | "created_at"> & {
+  id: string;
+  created_at?: string;
+};
 
 interface ConversationMessage {
   role: "user" | "assistant";
@@ -333,6 +348,12 @@ export function NotesPage() {
     []
   );
   const [flashcardDialogOpen, setFlashcardDialogOpen] = useState(false);
+  const [flashcardSelectionOpen, setFlashcardSelectionOpen] = useState(false);
+  const [flashcardSelection, setFlashcardSelection] = useState<GeneratedFlashcard[]>([]);
+  const [selectedFlashcardIds, setSelectedFlashcardIds] = useState<Set<string>>(new Set());
+  const [flashcardModelInUse, setFlashcardModelInUse] = useState<string | null>(null);
+  const [savingFlashcards, setSavingFlashcards] = useState(false);
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
   const [uploadState, setUploadState] = useState<{
     status: "idle" | "uploading" | "processing";
     filename?: string;
@@ -359,6 +380,18 @@ export function NotesPage() {
     },
     [getIdToken]
   );
+
+  const profileQuery = useQuery({
+    enabled: Boolean(userId),
+    queryKey: ["profile", userId],
+    queryFn: async (): Promise<ProfileRecord | null> => {
+      if (!userId) return null;
+      const snap = await getDoc(doc(firebaseDb, "profiles", userId));
+      if (!snap.exists()) return null;
+      const data = snap.data() as Omit<ProfileRecord, "id">;
+      return { id: snap.id, ...data };
+    },
+  });
 
   const foldersQuery = useQuery({
     enabled: Boolean(userId),
@@ -978,21 +1011,109 @@ export function NotesPage() {
       showSnackbar("Select a note first", "info");
       return;
     }
+    setGeneratingFlashcards(true);
     try {
-      const data = await callFunction<any>("ai-flashcards-generate", {
+      const data = await callFunction<{
+        flashcards: GeneratedFlashcard[];
+        model?: string | null;
+      }>("ai-flashcards-generate", {
         note_id: selectedNoteId,
+        persist: false,
+        model: profileQuery.data?.llm_model ?? undefined,
+        provider: profileQuery.data?.llm_provider ?? undefined,
       });
-      setLatestFlashcards(data.flashcards ?? []);
-      setFlashcardDialogOpen(true);
-      showSnackbar(`Generated ${data.flashcards?.length ?? 0} flashcards`);
+      const generated =
+        (data.flashcards ?? []).map((card) => ({
+          ...card,
+          id: card.id || crypto.randomUUID(),
+        })) ?? [];
+      if (!generated.length) {
+        showSnackbar("No flashcards generated. Try adjusting the note content.", "info");
+        return;
+      }
+      setFlashcardSelection(generated);
+      setSelectedFlashcardIds(new Set(generated.map((card) => card.id)));
+      setFlashcardModelInUse(data.model ?? profileQuery.data?.llm_model ?? null);
+      setFlashcardSelectionOpen(true);
       console.info("[notes] flashcard generation success", {
         noteId: selectedNoteId,
-        generated: data.flashcards?.length ?? 0,
+        generated: generated.length,
+        model: data.model ?? profileQuery.data?.llm_model ?? "default",
       });
     } catch (error: any) {
       console.error("[notes] flashcard generation failed", error);
       showSnackbar(error?.message ?? "Flashcard generation failed", "error");
+    } finally {
+      setGeneratingFlashcards(false);
     }
+  };
+
+  const handleSaveSelectedFlashcards = async () => {
+    if (!selectedNoteId) return;
+    const selectedCards = flashcardSelection.filter((card) =>
+      selectedFlashcardIds.has(card.id)
+    );
+    if (!selectedCards.length) {
+      showSnackbar("Select at least one card to save.", "info");
+      return;
+    }
+    setSavingFlashcards(true);
+    try {
+      const payloadCards = selectedCards.map((card) => ({
+        term: card.term_en ?? card.term_zh ?? "",
+        definition: card.definition_en ?? card.definition_zh,
+        context: card.context_en ?? card.context_zh ?? null,
+        category: card.category ?? "definition",
+      }));
+      const data = await callFunction<{
+        flashcards: FlashcardRecord[];
+        saved_count: number;
+        set_id?: string;
+      }>("flashcards-save", {
+        note_id: selectedNoteId,
+        model: flashcardModelInUse ?? profileQuery.data?.llm_model ?? undefined,
+        provider: profileQuery.data?.llm_provider ?? undefined,
+        cards: payloadCards,
+        name: noteDetail?.title ?? undefined,
+      });
+      setLatestFlashcards(data.flashcards ?? []);
+      setFlashcardDialogOpen(true);
+      setFlashcardSelectionOpen(false);
+      showSnackbar(
+        `Saved ${data.saved_count ?? data.flashcards?.length ?? selectedCards.length} flashcards`
+      );
+      console.info("[notes] flashcard save success", {
+        noteId: selectedNoteId,
+        saved: data.saved_count ?? data.flashcards?.length ?? selectedCards.length,
+        setId: data.set_id,
+      });
+    } catch (error: any) {
+      console.error("[notes] flashcard save failed", error);
+      showSnackbar(error?.message ?? "Failed to save flashcards", "error");
+    } finally {
+      setSavingFlashcards(false);
+    }
+  };
+
+  const toggleFlashcardSelection = (id: string, next?: boolean) => {
+    setSelectedFlashcardIds((prev) => {
+      const updated = new Set(prev);
+      const shouldSelect = typeof next === "boolean" ? next : !updated.has(id);
+      if (shouldSelect) {
+        updated.add(id);
+      } else {
+        updated.delete(id);
+      }
+      return updated;
+    });
+  };
+
+  const selectAllFlashcards = () => {
+    setSelectedFlashcardIds(new Set(flashcardSelection.map((card) => card.id)));
+  };
+
+  const clearFlashcardSelection = () => {
+    setSelectedFlashcardIds(new Set());
   };
 
   const handleAskAI = async () => {
@@ -1529,9 +1650,9 @@ export function NotesPage() {
                 startIcon={<StyleIcon />}
                 variant="contained"
                 onClick={handleFlashcards}
-                disabled={!selectedNoteId}
+                disabled={!selectedNoteId || generatingFlashcards}
               >
-                Generate Flashcards
+                {generatingFlashcards ? "Generating..." : "Generate Flashcards"}
               </Button>
               <Button
                 startIcon={<QuestionAnswerIcon />}
@@ -1867,6 +1988,114 @@ export function NotesPage() {
       </Dialog>
 
       <Dialog
+        open={flashcardSelectionOpen}
+        onClose={() => {
+          if (savingFlashcards) return;
+          setFlashcardSelectionOpen(false);
+        }}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Review generated flashcards</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              justifyContent="space-between"
+            >
+              <Typography variant="body2" color="text.secondary">
+                Using model:{" "}
+                {flashcardModelInUse ??
+                  profileQuery.data?.llm_model ??
+                  "default (workspace setting)"}
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <Button size="small" variant="outlined" onClick={selectAllFlashcards}>
+                  Select all
+                </Button>
+                <Button size="small" variant="outlined" onClick={clearFlashcardSelection}>
+                  Clear all
+                </Button>
+              </Stack>
+            </Stack>
+            <List dense>
+              {flashcardSelection.map((card) => (
+                <ListItem
+                  key={card.id}
+                  alignItems="flex-start"
+                  secondaryAction={
+                    <Checkbox
+                      edge="end"
+                      checked={selectedFlashcardIds.has(card.id)}
+                      onChange={(event) => toggleFlashcardSelection(card.id, event.target.checked)}
+                    />
+                  }
+                >
+                  <ListItemText
+                    primary={
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="subtitle1">
+                          {card.term_en ?? card.term_zh ?? "Term"}
+                        </Typography>
+                        <Chip
+                          label={(card.category ?? "definition").toUpperCase()}
+                          size="small"
+                        />
+                      </Stack>
+                    }
+                    secondary={
+                      <Stack spacing={0.5}>
+                        <Typography variant="body2" color="text.primary">
+                          {card.definition_en ?? card.definition_zh}
+                        </Typography>
+                        {card.context_en || card.context_zh ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {card.context_en ?? card.context_zh}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    }
+                  />
+                </ListItem>
+              ))}
+              {!flashcardSelection.length && (
+                <ListItem>
+                  <ListItemText
+                    primary="No flashcards generated yet."
+                    secondary="Generate flashcards from a note to review and select them here."
+                  />
+                </ListItem>
+              )}
+            </List>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              if (savingFlashcards) return;
+              setFlashcardSelectionOpen(false);
+              setFlashcardSelection([]);
+              setSelectedFlashcardIds(new Set());
+            }}
+            disabled={savingFlashcards}
+          >
+            Start over
+          </Button>
+          <Button
+            onClick={handleSaveSelectedFlashcards}
+            variant="contained"
+            disabled={savingFlashcards || !selectedFlashcardIds.size}
+          >
+            {savingFlashcards
+              ? "Saving..."
+              : `Save ${selectedFlashcardIds.size} flashcard${selectedFlashcardIds.size === 1 ? "" : "s"}`}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
         open={flashcardDialogOpen}
         onClose={() => setFlashcardDialogOpen(false)}
         fullWidth
@@ -1874,6 +2103,9 @@ export function NotesPage() {
       >
         <DialogTitle>Flashcards</DialogTitle>
         <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Saved to Firestore{latestFlashcards[0]?.set_id ? ` (set ${latestFlashcards[0]?.set_id})` : ""}.
+          </Typography>
           <List dense>
             {latestFlashcards.map((card) => (
               <ListItem key={card.id}>

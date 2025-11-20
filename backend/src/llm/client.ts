@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { jsonrepair } from "jsonrepair";
 
 export interface LLMConfig {
   provider: string;
@@ -154,23 +155,63 @@ export class LLMClient {
       },
     });
 
-    const text =
-      typeof response.response?.text === "function"
-        ? response.response.text()
-        : undefined;
-    if (typeof text !== "string" || !text.trim()) {
-      const fallback =
-        response.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (!fallback || typeof fallback !== "string") {
-        throw new Error("Gemini response missing text content");
+    const root: any = (response as any).response ?? response;
+
+    const textFn =
+      typeof root?.text === "function" ? root.text() : undefined;
+    const partsText =
+      root?.candidates?.[0]?.content?.parts
+        ?.map((part: any) => {
+          if (typeof part === "string") return part;
+          if (part?.text && typeof part.text === "string") return part.text;
+          if (part?.inlineData?.data && typeof part.inlineData.data === "string") {
+            return part.inlineData.data;
+          }
+          return "";
+        })
+        .join("")
+        .trim() ?? "";
+
+    const text = (textFn ?? "").trim() || partsText;
+    if (!text) {
+      throw new Error("Gemini response missing text content");
+    }
+
+    const cleaned = text
+      .trim()
+      .replace(/^```(?:json)?/i, "")
+      .replace(/```$/, "")
+      .trim();
+
+    const tryParse = (input: string): { ok: true; value: T } | { ok: false } => {
+      try {
+        return { ok: true, value: JSON.parse(input) as T };
+      } catch {
+        return { ok: false };
       }
-      return JSON.parse(fallback) as T;
+    };
+
+    const parsedDirect = tryParse(cleaned);
+    if (parsedDirect.ok) {
+      return parsedDirect.value;
+    }
+
+    const jsonMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (jsonMatch) {
+      const parsedMatch = tryParse(jsonMatch[0]);
+      if (parsedMatch.ok) {
+        return parsedMatch.value;
+      }
     }
 
     try {
-      return JSON.parse(text) as T;
-    } catch (error) {
-      throw new Error(`Gemini response was not valid JSON: ${text}`);
+      const repaired = jsonrepair(cleaned);
+      const parsedRepaired = JSON.parse(repaired) as T;
+      return parsedRepaired;
+    } catch {
+      // fall through
     }
+
+    throw new Error(`Gemini response was not valid JSON: ${text}`);
   }
 }

@@ -11,7 +11,6 @@ import {
   Chip,
   Divider,
   IconButton,
-  LinearProgress,
   MenuItem,
   Paper,
   Snackbar,
@@ -72,6 +71,7 @@ interface FlashcardRecord {
   user_id: string;
   note_id?: string | null;
   document_id?: string | null;
+  set_id?: string | null;
   term_zh?: string | null;
   term_en?: string | null;
   definition_zh: string;
@@ -434,28 +434,6 @@ export function FlashcardsPage() {
     };
   }, [filteredFlashcards, reviewsQuery.data, lastReviewByCard]);
 
-  const forgettingCurve = useMemo(() => {
-    if (!filteredFlashcards.length) return [];
-    const days = 7;
-    const now = dayjs();
-    return Array.from({ length: days }).map((_, index) => {
-      const targetDate = now.add(index, "day");
-      let totalProb = 0;
-      filteredFlashcards.forEach((card) => {
-        const lastReview = lastReviewByCard.get(card.id);
-        const lastDate = lastReview
-          ? dayjs(lastReview.reviewed_at)
-          : dayjs(card.next_due_at ?? card.created_at ?? now.toISOString());
-        const interval = Math.max(1, lastReview?.interval_days ?? 1);
-        const daysElapsed = targetDate.diff(lastDate, "day");
-        const retention = Math.exp(-daysElapsed / (interval * 1.4));
-        totalProb += retention;
-      });
-      const average = totalProb / filteredFlashcards.length;
-      return { label: targetDate.format("ddd"), value: Math.round(average * 100) };
-    });
-  }, [filteredFlashcards, lastReviewByCard]);
-
   const availableNotes = useMemo(() => {
     const notes = notesQuery.data ?? [];
     if (!selectedFolderId) return notes;
@@ -636,7 +614,7 @@ export function FlashcardsPage() {
                   </Stack>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
-                    Tap "Show answer" when you're ready. Responses update Firestore review history.
+                    Tap "Show answer" when you're ready, then choose Needs review or I knew this to update Firestore.
                   </Typography>
                 )}
               </Stack>
@@ -665,22 +643,32 @@ export function FlashcardsPage() {
               borderColor: "divider",
             }}
           >
-            {(["again", "hard", "good", "easy"] as ReviewResponse[]).map((label) => (
-              <Button
-                key={label}
-                size="small"
-                variant="contained"
-                color={label === "easy" ? "success" : label === "again" ? "error" : "primary"}
-                sx={{ flex: 1 }}
-                disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
-                onClick={() =>
-                  activeCard &&
-                  reviewMutation.mutate({ cardId: activeCard.id, response: label })
-                }
-              >
-                {label.charAt(0).toUpperCase() + label.slice(1)}
-              </Button>
-            ))}
+            <Button
+              size="small"
+              variant="outlined"
+              color="warning"
+              sx={{ flex: 1 }}
+              disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
+              onClick={() =>
+                activeCard &&
+                reviewMutation.mutate({ cardId: activeCard.id, response: "again" })
+              }
+            >
+              Needs review
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="success"
+              sx={{ flex: 1 }}
+              disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
+              onClick={() =>
+                activeCard &&
+                reviewMutation.mutate({ cardId: activeCard.id, response: "easy" })
+              }
+            >
+              I knew this
+            </Button>
           </Box>
         </Card>
 
@@ -867,59 +855,6 @@ export function FlashcardsPage() {
           </Table>
         </Paper>
 
-        <Paper sx={{ p: 2, position: "relative" }}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            Forgetting curve (projection)
-          </Typography>
-          <Typography variant="body2" color="text.secondary" mb={1}>
-            Based on your latest intervals. Higher is better; review before the curve dips.
-          </Typography>
-          {!forgettingCurve.length ? (
-            <Typography variant="body2" color="text.secondary">
-              Add or review cards to see a projection.
-            </Typography>
-          ) : (
-            <Box sx={{ mt: 1 }}>
-              <svg viewBox="0 0 300 160" role="presentation" width="100%" height="160">
-                <polyline
-                  fill="none"
-                  stroke="#1e6ad4"
-                  strokeWidth={3}
-                  points={forgettingCurve
-                    .map((point, idx) => {
-                      const x = (300 / Math.max(1, forgettingCurve.length - 1)) * idx;
-                      const y = 150 - (point.value / 100) * 140;
-                      return `${x},${y}`;
-                    })
-                    .join(" ")}
-                />
-                {forgettingCurve.map((point, idx) => {
-                  const x = (300 / Math.max(1, forgettingCurve.length - 1)) * idx;
-                  const y = 150 - (point.value / 100) * 140;
-                  return (
-                    <g key={point.label}>
-                      <circle cx={x} cy={y} r={4} fill="#1e6ad4" />
-                      <text x={x} y={155} fontSize="10" textAnchor="middle" fill="#6c757d">
-                        {point.label}
-                      </text>
-                      <text x={x} y={y - 8} fontSize="11" textAnchor="middle" fill="#1e6ad4">
-                        {point.value}%
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-              <LinearProgress
-                variant="determinate"
-                value={stats.completion}
-                sx={{ mt: 1 }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                Overall completion: {stats.completion}% of visible cards not due.
-              </Typography>
-            </Box>
-          )}
-        </Paper>
       </Box>
 
       <Snackbar

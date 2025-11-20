@@ -6,15 +6,23 @@ const runtime = runtimeConfig;
 
 export interface UserScopedLLMParams extends JSONGenerationParams {
   userId: string;
+  model?: string;
+  provider?: string;
 }
 
-async function getLLMClient(userId: string): Promise<LLMClient> {
+async function getLLMClient(
+  userId: string,
+  overrides?: { model?: string; provider?: string }
+): Promise<LLMClient> {
   const profile = await getProfileById(userId);
-  const providerSource = profile?.llm_provider ?? runtime.defaultLLMProvider;
+  const providerSource =
+    overrides?.provider ??
+    profile?.llm_provider ??
+    runtime.defaultLLMProvider;
   const provider = providerSource.toLowerCase();
   return new LLMClient({
     provider,
-    model: profile?.llm_model ?? runtime.defaultLLMModel,
+    model: overrides?.model ?? profile?.llm_model ?? runtime.defaultLLMModel,
     apiKey: runtime.llmApiKey,
     baseUrl: runtime.llmBaseUrl,
   });
@@ -23,8 +31,8 @@ async function getLLMClient(userId: string): Promise<LLMClient> {
 export async function generateUserJSON<T>(
   params: UserScopedLLMParams
 ): Promise<T> {
-  const { userId, ...rest } = params;
-  const client = await getLLMClient(userId);
+  const { userId, model, provider, ...rest } = params;
+  const client = await getLLMClient(userId, { model, provider });
   const { metadata, ...llmParams } = rest;
   return client.generateJSON<T>({
     ...(llmParams as JSONGenerationParams),

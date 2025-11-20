@@ -5,7 +5,9 @@ import { BadRequestError, UnauthorizedError } from "../../errors";
 import {
   createFlashcards,
   createFlashcardGenerationLog,
+  createFlashcardSet,
   getNoteById,
+  updateFlashcardSet,
 } from "../../services/firestore";
 import { generateUserJSON } from "../../services/llm";
 import {
@@ -43,6 +45,15 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
       if (!userId) {
         throw new BadRequestError("User context missing from request.");
       }
+
+      const requestedModel =
+        typeof payload.model === "string" && payload.model.trim()
+          ? payload.model.trim()
+          : undefined;
+      const requestedProvider =
+        typeof payload.provider === "string" && payload.provider.trim()
+          ? payload.provider.trim()
+          : undefined;
 
       const note = await getNoteById(payload.note_id);
       if (!note) {
@@ -82,6 +93,8 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
           keywords: FlashcardKeywordLLMItem[];
         }>({
           userId,
+          model: requestedModel,
+          provider: requestedProvider,
           systemPrompt: NOTE_FLASHCARD_KEYWORDS_PROMPT,
           userPrompt: keywordUserPrompt,
           schemaName: "NoteFlashcardKeywordsResult",
@@ -113,6 +126,8 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
             });
             const cardResult = await generateUserJSON<{ flashcard: FlashcardCardLLMItem }>({
               userId,
+              model: requestedModel,
+              provider: requestedProvider,
               systemPrompt: NOTE_FLASHCARD_CARD_PROMPT,
               userPrompt: JSON.stringify({
                 note_title: note.title,
@@ -172,6 +187,7 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
             candidate_count: keywords.length,
             generated_count: 0,
             saved_count: 0,
+            model: requestedModel ?? null,
           });
           res.json({
             note_id: note.id,
@@ -192,15 +208,27 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
             candidate_count: keywords.length,
             generated_count: limitedRecords.length,
             saved_count: 0,
+            model: requestedModel ?? null,
           });
           res.json({
             note_id: note.id,
             flashcards: limitedRecords,
             saved_count: 0,
+            model: requestedModel ?? null,
             summary: null,
           });
           return;
         }
+
+        const set = await createFlashcardSet({
+          user_id: userId,
+          note_id: note.id,
+          name: note.title,
+          source: "note",
+          model: requestedModel ?? null,
+          provider: requestedProvider ?? null,
+          flashcard_ids: [],
+        });
 
         const records = limitedRecords.map((card) => ({
           user_id: userId,
@@ -213,9 +241,13 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
           context_zh: card.context_zh ?? null,
           context_en: card.context_en ?? null,
           category: card.category as FlashcardCategory,
+          set_id: set.id,
         }));
 
         const created = await createFlashcards(records);
+        await updateFlashcardSet(set.id, {
+          flashcard_ids: created.map((card) => card.id),
+        });
 
         await createFlashcardGenerationLog({
           user_id: userId,
@@ -225,12 +257,16 @@ export function registerAiFlashcardsGenerateRoute(router: Router): void {
           candidate_count: keywords.length,
           generated_count: limitedCards.length,
           saved_count: created.length,
+          set_id: set.id,
+          model: requestedModel ?? null,
         });
 
         res.json({
           note_id: note.id,
           flashcards: created,
           saved_count: created.length,
+          set_id: set.id,
+          model: requestedModel ?? null,
           summary: null,
         });
       } catch (error: any) {
