@@ -81,9 +81,18 @@ import {
   updateDoc,
   deleteDoc,
   limit,
+  writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
+import {
+  useAIQA,
+  useReindexNote,
+  useTranslateNote,
+  useExtractTerminology,
+} from "../../services/hooks/useNoteAI";
+import { useProcessDocument } from "../../services/hooks/useDocuments";
+import { useGenerateFlashcards } from "../../services/hooks/useFlashcards";
 import {
   ref as storageRef,
   uploadBytes,
@@ -92,7 +101,7 @@ import {
   firebaseDb,
   firebaseStorage,
 } from "../../lib/firebaseClient";
-import { invokeFunction } from "../../lib/apiClient";
+
 
 const DOCUMENTS_BUCKET = "documents";
 const AUTO_HISTORY_INTERVAL_MS = 60_000;
@@ -311,6 +320,14 @@ export function NotesPage() {
   const queryClient = useQueryClient();
   const userId = user?.uid ?? null;
 
+  // React Query Hooks
+  const aiQA = useAIQA();
+  const reindexNote = useReindexNote();
+  const translateNote = useTranslateNote();
+  const extractTerms = useExtractTerminology();
+  const processDocument = useProcessDocument();
+  const generateFlashcards = useGenerateFlashcards();
+
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<NoteDraftState>({
@@ -373,13 +390,7 @@ export function NotesPage() {
   const [styleMenuAnchor, setStyleMenuAnchor] = useState<HTMLElement | null>(
     null
   );
-  const callFunction = useCallback(
-    async <T,>(name: string, body: Record<string, unknown>): Promise<T> => {
-      const token = await getIdToken();
-      return invokeFunction<T>({ name, body, idToken: token });
-    },
-    [getIdToken]
-  );
+
 
   const profileQuery = useQuery({
     enabled: Boolean(userId),
@@ -982,14 +993,11 @@ export function NotesPage() {
     }
     setTranslateLoading(true);
     try {
-      const data = await callFunction<{ translated_markdown: string }>(
-        "ai-notes-translate",
-        {
-          note_id: selectedNoteId,
-          text: sourceText,
-          target_language: targetLanguage,
-        }
-      );
+      const data = await translateNote.mutateAsync({
+        note_id: selectedNoteId,
+        target_language: targetLanguage,
+        content: sourceText,
+      });
       setNoteDraft((prev) => ({
         ...prev,
         content: data.translated_markdown,
@@ -1013,14 +1021,10 @@ export function NotesPage() {
     }
     setGeneratingFlashcards(true);
     try {
-      const data = await callFunction<{
-        flashcards: GeneratedFlashcard[];
-        model?: string | null;
-      }>("ai-flashcards-generate", {
+      const data = await generateFlashcards.mutateAsync({
         note_id: selectedNoteId,
-        persist: false,
-        model: profileQuery.data?.llm_model ?? undefined,
-        provider: profileQuery.data?.llm_provider ?? undefined,
+        count: 10, // Default count
+        auto_save: false, // We handle saving manually in this UI
       });
       const generated =
         (data.flashcards ?? []).map((card) => ({
@@ -1065,17 +1069,40 @@ export function NotesPage() {
         context: card.context_en ?? card.context_zh ?? null,
         category: card.category ?? "definition",
       }));
-      const data = await callFunction<{
-        flashcards: FlashcardRecord[];
-        saved_count: number;
-        set_id?: string;
-      }>("flashcards-save", {
-        note_id: selectedNoteId,
-        model: flashcardModelInUse ?? profileQuery.data?.llm_model ?? undefined,
-        provider: profileQuery.data?.llm_provider ?? undefined,
-        cards: payloadCards,
-        name: noteDetail?.title ?? undefined,
+      // Batch save to Firestore
+      const batch = writeBatch(firebaseDb);
+      const flashcardsCol = collection(firebaseDb, "flashcards");
+      const now = new Date().toISOString();
+
+      const savedCards: FlashcardRecord[] = selectedCards.map((card) => {
+        const newDocRef = doc(flashcardsCol);
+        const newCard: FlashcardRecord = {
+          id: newDocRef.id,
+          user_id: userId!,
+          note_id: selectedNoteId,
+          document_id: null,
+          term_en: card.term_en ?? card.term_zh ?? null,
+          term_zh: card.term_zh ?? null,
+          definition_en: card.definition_en,
+          definition_zh: card.definition_zh,
+          context_en: card.context_en ?? card.context_zh ?? null,
+          context_zh: card.context_zh ?? null,
+          category: card.category ?? "definition",
+          next_due_at: now,
+          created_at: now,
+          updated_at: now,
+        };
+        batch.set(newDocRef, newCard);
+        return newCard;
       });
+
+      await batch.commit();
+
+      const data = {
+        flashcards: savedCards,
+        saved_count: savedCards.length,
+        set_id: undefined
+      };
       setLatestFlashcards(data.flashcards ?? []);
       setFlashcardDialogOpen(true);
       setFlashcardSelectionOpen(false);
@@ -1123,8 +1150,8 @@ export function NotesPage() {
       askAIScope === "note" && selectedNoteId
         ? { type: "note", id: selectedNoteId }
         : askAIScope === "folder" && selectedFolderId
-        ? { type: "folder", id: selectedFolderId }
-        : { type: "all" };
+          ? { type: "folder", id: selectedFolderId }
+          : { type: "all" };
     const nextHistory: ConversationMessage[] = [
       ...chatHistory,
       { role: "user", content: askAIInput },
@@ -1139,10 +1166,10 @@ export function NotesPage() {
     ]);
     setAskAIInput("");
     try {
-      const data = await callFunction<{ answer: string }>("ai-notes-qa", {
+      const data = await aiQA.mutateAsync({
         question: askAIInput,
-        scope,
-        history: nextHistory,
+        note_id: askAIScope === "note" ? selectedNoteId : undefined,
+        // scope: askAIScope, // API handles scope via note_id presence for now
       });
       const answerText = data.answer ?? "";
       setChatMessages((prev) => [
@@ -1196,9 +1223,8 @@ export function NotesPage() {
     }
     setUploadState({ status: "uploading", filename: file.name });
     try {
-      const storagePath = `${DOCUMENTS_BUCKET}/${userId}/${Date.now()}-${
-        file.name
-      }`;
+      const storagePath = `${DOCUMENTS_BUCKET}/${userId}/${Date.now()}-${file.name
+        }`;
       const refObj = storageRef(firebaseStorage, storagePath);
       await uploadBytes(refObj, file, { cacheControl: "3600" });
       const docRef = await addDoc(collection(firebaseDb, "documents"), {
@@ -1210,8 +1236,9 @@ export function NotesPage() {
         updated_at: new Date().toISOString(),
       });
       setUploadState({ status: "processing", filename: file.name });
-      const data = await callFunction<any>("documents-upload-process", {
+      const data = await processDocument.mutateAsync({
         document_id: docRef.id,
+        file_path: storagePath,
       });
       setUploadState({ status: "idle" });
       const extractedEn = noteProcessorResultToMarkdown(data.noteDraft, "en");
@@ -1265,9 +1292,9 @@ export function NotesPage() {
                 event.clientY - bounds.top < bounds.height / 3
                   ? "before"
                   : event.clientY - bounds.top >
-                      (bounds.height / 3) * 2
-                  ? "after"
-                  : "inside";
+                    (bounds.height / 3) * 2
+                    ? "after"
+                    : "inside";
               handleFolderDrop(draggedId, node, position);
             }}
             sx={{
@@ -1548,15 +1575,15 @@ export function NotesPage() {
                   autoSaveState === "saving"
                     ? "warning"
                     : autoSaveState === "saved"
-                    ? "success"
-                    : "default"
+                      ? "success"
+                      : "default"
                 }
                 label={
                   autoSaveState === "saving"
                     ? "Saving..."
                     : autoSaveState === "saved"
-                    ? "Saved"
-                    : "Idle"
+                      ? "Saved"
+                      : "Idle"
                 }
               />
               <Tooltip title="Save now (Cmd/Ctrl + S)">
@@ -1614,7 +1641,7 @@ export function NotesPage() {
                     onClick={async () => {
                       if (!selectedNoteId) return;
                       try {
-                        await callFunction("notes-reindex", {
+                        await reindexNote.mutateAsync({
                           note_id: selectedNoteId,
                         });
                         showSnackbar("Note reindexed", "success");
@@ -2110,9 +2137,8 @@ export function NotesPage() {
             {latestFlashcards.map((card) => (
               <ListItem key={card.id}>
                 <ListItemText
-                  primary={`${card.category.toUpperCase()}: ${
-                    card.term_en ?? card.term_zh ?? "Term"
-                  }`}
+                  primary={`${card.category.toUpperCase()}: ${card.term_en ?? card.term_zh ?? "Term"
+                    }`}
                   secondary={`${card.definition_en.slice(
                     0,
                     80
