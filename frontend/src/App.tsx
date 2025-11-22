@@ -7,7 +7,19 @@ import { AuthProvider } from "./providers/AuthProvider";
 
 function App() {
   useEffect(() => {
-    console.info("✅ Backend connection configured", backendConnectionInfo);
+    // Display comprehensive configuration information
+    console.log(
+      "%c🚀 LearningAier Configuration ",
+      "background: #4CAF50; color: white; font-weight: bold; padding: 4px 8px; border-radius: 4px;"
+    );
+    console.group("Environment Details");
+    console.log(`📍 Mode: %c${backendConnectionInfo.mode}`, "color: #2196F3; font-weight: bold");
+    console.log(`🔗 Backend URL: %c${backendConnectionInfo.apiBaseUrl}`, "color: #FF9800; font-weight: bold");
+    console.log(`🗄️  Database: %cFirestore (${backendConnectionInfo.projectId})`, "color: #9C27B0; font-weight: bold");
+    console.log(`💾 Storage Bucket: %c${backendConnectionInfo.storageBucket}`, "color: #F44336; font-weight: bold");
+    console.log(`⏰ Initialized: ${backendConnectionInfo.generatedAt}`);
+    console.groupEnd();
+    console.log(""); // Empty line for spacing
   }, []);
 
   return (
