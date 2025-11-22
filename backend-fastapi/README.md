@@ -174,6 +174,39 @@ curl -X POST http://localhost:8787/api/documents/upload-process \
 3. Create route handler in `app/api/`
 4. Register router in `app/main.py`
 
+### Running Tests
+
+The backend includes automated tests using pytest. All tests use mocks for Firebase, Pinecone, and Gemini, so they can run without real credentials.
+
+**Run all tests:**
+```bash
+PYTHONPATH=. pytest -v
+```
+
+**Run with coverage:**
+```bash
+PYTHONPATH=. pytest --cov=app --cov-report=term
+```
+
+**Run specific test:**
+```bash
+PYTHONPATH=. pytest tests/test_api.py::test_health_check
+```
+
+**Available tests:**
+- `test_health_check` - Health endpoint
+- `test_ai_qa` - RAG Q&A endpoint
+- `test_ai_translate` - Translation endpoint
+- `test_ai_terminology` - Terminology extraction
+- `test_generate_flashcards` - Flashcard generation
+- `test_review_flashcard` - Flashcard review
+
+**Note:** Tests require virtual environment to be activated:
+```bash
+source venv/bin/activate
+PYTHONPATH=. pytest -v
+```
+
 ## Deployment
 
 ### Docker (Recommended)
