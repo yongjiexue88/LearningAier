@@ -22,7 +22,7 @@ import {
 import {
     useGenerateFlashcards,
     useReviewFlashcard,
-} from "../../services/hooks/useFlashcards";
+} from "../services/hooks/useFlashcards";
 
 interface FlashcardGeneratorProps {
     noteId: string;
@@ -80,7 +80,7 @@ export function FlashcardGenerator({ noteId }: FlashcardGeneratorProps) {
                         </Alert>
 
                         <Stack spacing={1}>
-                            {generateFlashcards.data.flashcards.slice(0, 3).map((card, idx) => (
+                            {generateFlashcards.data.flashcards.slice(0, 3).map((card: any, idx: number) => (
                                 <Paper key={idx} sx={{ p: 2 }}>
                                     <Typography variant="body2" color="text.secondary">
                                         Front:

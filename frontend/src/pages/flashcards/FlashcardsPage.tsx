@@ -94,8 +94,6 @@ interface FlashcardReviewRecord {
   interval_days: number;
 }
 
-type ReviewResponse = FlashcardReviewRecord["response"];
-
 interface SnackbarState {
   open: boolean;
   message: string;
@@ -131,7 +129,7 @@ function isMissingIndexError(error: unknown): error is FirebaseError {
 }
 
 export function FlashcardsPage() {
-  const { user, getIdToken } = useAuth();
+  const { user } = useAuth();
   const userId = user?.uid ?? null;
   const queryClient = useQueryClient();
 
@@ -359,15 +357,6 @@ export function FlashcardsPage() {
   const reviewMutation = useReviewFlashcard();
 
   const handleReview = (cardId: string, quality: number) => {
-    // Convert response quality to SM-2 scale (0-5)
-    // "again" = 0, "hard" = 2, "good" = 3, "easy" = 5
-    const qualityMap: Record<ReviewResponse, number> = {
-      again: 0,
-      hard: 2,
-      good: 3,
-      easy: 5,
-    };
-
     reviewMutation.mutate(
       {
         flashcard_id: cardId,

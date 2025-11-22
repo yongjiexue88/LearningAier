@@ -23,14 +23,14 @@ import {
     useReindexNote,
     useTranslateNote,
     useExtractTerminology,
-} from "../../services/hooks/useNoteAI";
+} from "../services/hooks/useNoteAI";
 
 interface NoteAIActionsProps {
     noteId: string;
     onUpdate?: () => void;
 }
 
-export function NoteAIActions({ noteId, onUpdate }: NoteAIActionsProps) {
+export function NoteAIActions({ noteId }: NoteAIActionsProps) {
     const [question, setQuestion] = useState("");
     const [terminologyText, setTerminologyText] = useState("");
 
@@ -111,7 +111,7 @@ export function NoteAIActions({ noteId, onUpdate }: NoteAIActionsProps) {
                                     <Typography variant="body2" color="text.secondary">
                                         Sources ({aiQA.data.sources.length}):
                                     </Typography>
-                                    {aiQA.data.sources.map((source, idx) => (
+                                    {aiQA.data.sources.map((source: any, idx: number) => (
                                         <Typography
                                             key={source.chunk_id}
                                             variant="caption"
@@ -174,7 +174,7 @@ export function NoteAIActions({ noteId, onUpdate }: NoteAIActionsProps) {
                             <Typography variant="body2" gutterBottom>
                                 Found {extractTerms.data.terms.length} terms:
                             </Typography>
-                            {extractTerms.data.terms.map((term, idx) => (
+                            {extractTerms.data.terms.map((term: any, idx: number) => (
                                 <Box
                                     key={idx}
                                     sx={{

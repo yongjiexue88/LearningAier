@@ -5,7 +5,6 @@
  * Integrate this into your document upload page.
  */
 
-import { useState } from "react";
 import {
     Box,
     Button,
@@ -16,7 +15,8 @@ import {
     Alert,
     LinearProgress,
 } from "@mui/material";
-import { useProcessDocument } from "../../services/hooks/useDocuments";
+import { useProcessDocument } from "../services/hooks/useDocuments";
+import type { UploadProcessResponse } from "../services/api/types";
 
 interface DocumentProcessorProps {
     documentId: string;
@@ -39,7 +39,7 @@ export function DocumentProcessor({
                 chunk_size: 500,
             },
             {
-                onSuccess: (data) => {
+                onSuccess: (data: UploadProcessResponse) => {
                     if (data.note_id && onSuccess) {
                         onSuccess(data.note_id);
                     }

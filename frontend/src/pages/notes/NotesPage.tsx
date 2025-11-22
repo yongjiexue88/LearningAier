@@ -62,7 +62,6 @@ import {
   extractHeadings,
   formatReadingTime,
   isDescendant,
-  noteProcessorResultToMarkdown,
   slugify,
   type FolderNode,
   type FolderRecord,
@@ -89,7 +88,6 @@ import {
   useAIQA,
   useReindexNote,
   useTranslateNote,
-  useExtractTerminology,
 } from "../../services/hooks/useNoteAI";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 import { useGenerateFlashcards } from "../../services/hooks/useFlashcards";
@@ -316,7 +314,7 @@ type NoteDraftState = {
 };
 
 export function NotesPage() {
-  const { user, getIdToken } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const userId = user?.uid ?? null;
 
@@ -324,7 +322,6 @@ export function NotesPage() {
   const aiQA = useAIQA();
   const reindexNote = useReindexNote();
   const translateNote = useTranslateNote();
-  const extractTerms = useExtractTerminology();
   const processDocument = useProcessDocument();
   const generateFlashcards = useGenerateFlashcards();
 
@@ -1000,7 +997,7 @@ export function NotesPage() {
       });
       setNoteDraft((prev) => ({
         ...prev,
-        content: data.translated_markdown,
+        content: data.translated_content,
       }));
       showSnackbar(
         `Translated to ${languageLabels[targetLanguage]}`,
@@ -1026,10 +1023,20 @@ export function NotesPage() {
         count: 10, // Default count
         auto_save: false, // We handle saving manually in this UI
       });
-      const generated =
+      const generated: GeneratedFlashcard[] =
         (data.flashcards ?? []).map((card) => ({
           ...card,
-          id: card.id || crypto.randomUUID(),
+          id: crypto.randomUUID(),
+          set_id: null,
+          note_id: selectedNoteId,
+          document_id: null,
+          term_zh: null,
+          term_en: null,
+          definition_zh: card.back || "",
+          definition_en: card.back || "",
+          context_zh: null,
+          context_en: null,
+          category: "definition",
         })) ?? [];
       if (!generated.length) {
         showSnackbar("No flashcards generated. Try adjusting the note content.", "info");
@@ -1037,12 +1044,12 @@ export function NotesPage() {
       }
       setFlashcardSelection(generated);
       setSelectedFlashcardIds(new Set(generated.map((card) => card.id)));
-      setFlashcardModelInUse(data.model ?? profileQuery.data?.llm_model ?? null);
+      setFlashcardModelInUse(profileQuery.data?.llm_model ?? null);
       setFlashcardSelectionOpen(true);
       console.info("[notes] flashcard generation success", {
         noteId: selectedNoteId,
         generated: generated.length,
-        model: data.model ?? profileQuery.data?.llm_model ?? "default",
+        model: profileQuery.data?.llm_model ?? "default",
       });
     } catch (error: any) {
       console.error("[notes] flashcard generation failed", error);
@@ -1063,12 +1070,6 @@ export function NotesPage() {
     }
     setSavingFlashcards(true);
     try {
-      const payloadCards = selectedCards.map((card) => ({
-        term: card.term_en ?? card.term_zh ?? "",
-        definition: card.definition_en ?? card.definition_zh,
-        context: card.context_en ?? card.context_zh ?? null,
-        category: card.category ?? "definition",
-      }));
       // Batch save to Firestore
       const batch = writeBatch(firebaseDb);
       const flashcardsCol = collection(firebaseDb, "flashcards");
@@ -1078,7 +1079,6 @@ export function NotesPage() {
         const newDocRef = doc(flashcardsCol);
         const newCard: FlashcardRecord = {
           id: newDocRef.id,
-          user_id: userId!,
           note_id: selectedNoteId,
           document_id: null,
           term_en: card.term_en ?? card.term_zh ?? null,
@@ -1088,9 +1088,7 @@ export function NotesPage() {
           context_en: card.context_en ?? card.context_zh ?? null,
           context_zh: card.context_zh ?? null,
           category: card.category ?? "definition",
-          next_due_at: now,
           created_at: now,
-          updated_at: now,
         };
         batch.set(newDocRef, newCard);
         return newCard;
@@ -1146,12 +1144,6 @@ export function NotesPage() {
   const handleAskAI = async () => {
     if (!askAIInput.trim()) return;
     setAskAILoading(true);
-    const scope =
-      askAIScope === "note" && selectedNoteId
-        ? { type: "note", id: selectedNoteId }
-        : askAIScope === "folder" && selectedFolderId
-          ? { type: "folder", id: selectedFolderId }
-          : { type: "all" };
     const nextHistory: ConversationMessage[] = [
       ...chatHistory,
       { role: "user", content: askAIInput },
@@ -1168,7 +1160,7 @@ export function NotesPage() {
     try {
       const data = await aiQA.mutateAsync({
         question: askAIInput,
-        note_id: askAIScope === "note" ? selectedNoteId : undefined,
+        note_id: askAIScope === "note" ? (selectedNoteId ?? undefined) : undefined,
         // scope: askAIScope, // API handles scope via note_id presence for now
       });
       const answerText = data.answer ?? "";
@@ -1241,8 +1233,8 @@ export function NotesPage() {
         file_path: storagePath,
       });
       setUploadState({ status: "idle" });
-      const extractedEn = noteProcessorResultToMarkdown(data.noteDraft, "en");
-      const extractedZh = noteProcessorResultToMarkdown(data.noteDraft, "zh");
+      const extractedEn = data.text_preview || "";
+      const extractedZh = "";
       setNoteDraft({
         title: file.name,
         content: extractedEn || extractedZh,
