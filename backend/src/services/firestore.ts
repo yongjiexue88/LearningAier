@@ -53,7 +53,7 @@ export interface NoteChunkData {
   note_id: string;
   user_id: string;
   content: string;
-  embedding: number[];
+  embedding?: number[]; // Deprecated: Moved to Vector DB
   position: number;
   created_at?: string;
 }

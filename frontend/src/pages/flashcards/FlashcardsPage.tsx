@@ -43,7 +43,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
 import { firebaseDb } from "../../lib/firebaseClient";
-import { invokeFunction } from "../../lib/apiClient";
+import { useGenerateFlashcards, useReviewFlashcard } from "../../services/hooks/useFlashcards";
 
 dayjs.extend(relativeTime);
 
@@ -355,50 +355,68 @@ export function FlashcardsPage() {
     onError: (error: any) => showSnackbar(error?.message ?? "Delete failed", "error"),
   });
 
-  const reviewMutation = useMutation({
-    mutationFn: async ({ cardId, response }: { cardId: string; response: ReviewResponse }) => {
-      const token = await getIdToken();
-      if (!token) throw new Error("Missing auth token");
-      return invokeFunction<{ next_due_at: string }>({
-        name: "flashcards-review",
-        idToken: token,
-        body: { flashcard_id: cardId, response },
-      });
-    },
-    onSuccess: () => {
-      setShowAnswerFor(null);
-      queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
-      queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
-    },
-    onError: (error: any) => showSnackbar(error?.message ?? "Review failed", "error"),
-  });
+  // Use new React Query hook for flashcard review
+  const reviewMutation = useReviewFlashcard();
 
-  const generateMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedNoteId) {
-        throw new Error("Select a note to generate from");
+  const handleReview = (cardId: string, quality: number) => {
+    // Convert response quality to SM-2 scale (0-5)
+    // "again" = 0, "hard" = 2, "good" = 3, "easy" = 5
+    const qualityMap: Record<ReviewResponse, number> = {
+      again: 0,
+      hard: 2,
+      good: 3,
+      easy: 5,
+    };
+
+    reviewMutation.mutate(
+      {
+        flashcard_id: cardId,
+        quality,
+      },
+      {
+        onSuccess: () => {
+          setShowAnswerFor(null);
+          queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
+          queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
+        },
+        onError: (error: any) => {
+          showSnackbar(error?.message ?? "Review failed", "error");
+        },
       }
-      const token = await getIdToken();
-      if (!token) throw new Error("Missing auth token");
-      return invokeFunction<{ flashcards: FlashcardRecord[]; saved_count: number }>({
-        name: "ai-flashcards-generate",
-        idToken: token,
-        body: { note_id: selectedNoteId },
-      });
-    },
-    onSuccess: (data) => {
-      console.info("[flashcards] generation success", {
-        noteId: selectedNoteId,
-        generated: data.flashcards?.length ?? 0,
-      });
-      queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
-      showSnackbar(`Generated ${data.flashcards?.length ?? 0} flashcards`);
-    },
-    onError: (error: any) => {
-      console.error("[flashcards] generation failed", error);
-      showSnackbar(error?.message ?? "Generation failed", "error");
-    },
-  });
+    );
+  };
+
+  // Use new React Query hook for flashcard generation
+  const generateMutation = useGenerateFlashcards();
+
+  const handleGenerate = () => {
+    if (!selectedNoteId) {
+      showSnackbar("Select a note to generate from", "error");
+      return;
+    }
+
+    generateMutation.mutate(
+      {
+        note_id: selectedNoteId,
+        count: 10,
+        auto_save: true,
+      },
+      {
+        onSuccess: (data) => {
+          console.info("[flashcards] generation success", {
+            noteId: selectedNoteId,
+            generated: data.flashcards?.length ?? 0,
+          });
+          queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
+          showSnackbar(`Generated ${data.flashcards?.length ?? 0} flashcards`);
+        },
+        onError: (error: any) => {
+          console.error("[flashcards] generation failed", error);
+          showSnackbar(error?.message ?? "Generation failed", "error");
+        },
+      }
+    );
+  };
 
   const lastReviewByCard = useMemo(() => {
     const map = new Map<string, FlashcardReviewRecord>();
@@ -514,7 +532,7 @@ export function FlashcardsPage() {
           <Button
             variant="contained"
             startIcon={<AutoAwesomeIcon />}
-            onClick={() => generateMutation.mutate()}
+            onClick={handleGenerate}
             disabled={!selectedNoteId || generateMutation.isPending}
           >
             {generateMutation.isPending ? "Generating..." : "Generate from note"}
@@ -539,13 +557,13 @@ export function FlashcardsPage() {
           </Typography>
         </Paper>
         <Paper sx={{ p: 2 }}>
-        <Typography variant="overline" color="text.secondary">
-          Total cards
-        </Typography>
-        <Typography variant="h4">{stats.total}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          Within your current filters.
-        </Typography>
+          <Typography variant="overline" color="text.secondary">
+            Total cards
+          </Typography>
+          <Typography variant="h4">{stats.total}</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Within your current filters.
+          </Typography>
         </Paper>
         <Paper sx={{ p: 2 }}>
           <Typography variant="overline" color="text.secondary">
@@ -651,7 +669,7 @@ export function FlashcardsPage() {
               disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
               onClick={() =>
                 activeCard &&
-                reviewMutation.mutate({ cardId: activeCard.id, response: "again" })
+                handleReview(activeCard.id, 0)
               }
             >
               Needs review
@@ -664,7 +682,7 @@ export function FlashcardsPage() {
               disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
               onClick={() =>
                 activeCard &&
-                reviewMutation.mutate({ cardId: activeCard.id, response: "easy" })
+                handleReview(activeCard.id, 5)
               }
             >
               I knew this
@@ -765,17 +783,17 @@ export function FlashcardsPage() {
             </Box>
             <Chip label={`${filteredFlashcards.length} cards`} />
           </Stack>
-              <Divider sx={{ mb: 1 }} />
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Term</TableCell>
-                    <TableCell>Definition</TableCell>
-                    <TableCell>Due</TableCell>
-                    <TableCell>Note</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
+          <Divider sx={{ mb: 1 }} />
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Term</TableCell>
+                <TableCell>Definition</TableCell>
+                <TableCell>Due</TableCell>
+                <TableCell>Note</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
             <TableBody>
               {filteredFlashcards.map((card) => {
                 const noteTitle = card.note_id

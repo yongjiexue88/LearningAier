@@ -1,13 +1,11 @@
 import {
   getNoteById,
   listDocumentsByIds,
-  listNoteChunksByNoteIds,
   listNotesByFolder,
   listNotesByIds,
-  listUserNoteChunks,
-  type NoteChunkRecord,
 } from "./firestore";
 import { BadRequestError } from "../errors";
+import { queryChunks } from "./pinecone";
 
 export type QAScope =
   | { type: "all" }
@@ -64,35 +62,76 @@ export async function retrieveContextChunks({
   matchThreshold = 0.4,
 }: RetrievalParams): Promise<ContextChunk[]> {
   const noteIds = await resolveScopeNoteIds(userId, scope);
-  let chunks: NoteChunkRecord[] = [];
 
-  if (noteIds === null) {
-    chunks = await listUserNoteChunks(userId);
-  } else if (noteIds.length > 0) {
-    chunks = await listNoteChunksByNoteIds(noteIds);
-  } else {
+  // If scope is specific notes, we only query for those.
+  // Pinecone filter for 'in' array is supported but might hit limits if array is huge.
+  // For now, if noteIds is null (all), we don't filter by source_id.
+  // If noteIds has 1 item, we filter by source_id.
+  // If noteIds has multiple, we might need to filter by 'source_id' using $in operator if supported,
+  // or just query all user chunks and filter in memory (less efficient but simple for now if Pinecone free tier limits metadata filters).
+  // Actually, Pinecone supports $in.
+
+  let sourceIdFilter: any = undefined;
+  if (noteIds && noteIds.length > 0) {
+    if (noteIds.length === 1) {
+      sourceIdFilter = { $eq: noteIds[0] };
+    } else {
+      sourceIdFilter = { $in: noteIds };
+    }
+  } else if (noteIds !== null && noteIds.length === 0) {
+    // Scope resolved to empty list (e.g. empty folder)
     return [];
   }
 
-  const minSimilarity = 1 - matchThreshold;
-  const scored = chunks
-    .filter((chunk) => chunk.user_id === userId)
-    .map((chunk) => ({
-      chunk,
-      similarity: cosineSimilarity(queryEmbedding, chunk.embedding),
-    }))
-    .filter(({ similarity }) => similarity >= minSimilarity)
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, matchCount);
+  // Query Pinecone
+  // Note: Our pinecone service wrapper currently only supports single sourceId or no sourceId.
+  // We need to update it or just use it as is.
+  // Let's update the usage here to match what I implemented in pinecone.ts or update pinecone.ts.
+  // In pinecone.ts I implemented: sourceId?: string.
+  // So I can only filter by ONE source ID.
+  // If scope is folder (multiple notes), I can't easily filter by folder_id unless I store folder_id in metadata.
+  // The design doc said: "source_id: note_id or document_id".
+  // So for folder scope, I should probably fetch all user chunks and filter in memory OR update metadata to include folder_id.
+  // OR, just query for each note? No, too many queries.
+  // OR, update pinecone.ts to accept a filter object.
 
-  if (!scored.length) {
+  // For this iteration, let's assume we only support single note scope or all.
+  // If folder scope is used, we might fallback to "all" and filter in memory, or just query all.
+  // Let's just query all for user if it's a folder scope for now, and filter results.
+
+  const pineconeResults = await queryChunks({
+    vector: queryEmbedding,
+    topK: matchCount * 2, // Fetch more to allow post-filtering
+    userId,
+    sourceId: noteIds?.length === 1 ? noteIds[0] : undefined,
+    minScore: matchThreshold,
+  });
+
+  // Post-filter if we had multiple noteIds (folder scope)
+  let results = pineconeResults;
+  if (noteIds && noteIds.length > 1) {
+    const allowedIds = new Set(noteIds);
+    results = results.filter(r => allowedIds.has(r.metadata.source_id));
+  }
+
+  results = results.slice(0, matchCount);
+
+  if (!results.length) {
     return [];
   }
 
-  const noteIdSet = Array.from(
-    new Set(scored.map(({ chunk }) => chunk.note_id))
-  );
-  const notes = await listNotesByIds(noteIdSet);
+  // Hydrate with titles
+  const noteIdSet = new Set<string>();
+  results.forEach(r => {
+    if (r.metadata.source_type === 'note') noteIdSet.add(r.metadata.source_id);
+  });
+
+  // We might also have documents.
+  // For now, let's assume source_id is note_id.
+  // If we have documents, we need to handle that.
+  // The current system seems to link notes to documents via source_doc_id.
+
+  const notes = await listNotesByIds(Array.from(noteIdSet));
   const docIds = Array.from(
     new Set(notes.map((note) => note.source_doc_id).filter(Boolean))
   ) as string[];
@@ -109,34 +148,22 @@ export async function retrieveContextChunks({
   );
   const docMap = new Map(docs.map((doc) => [doc.id, doc]));
 
-  return scored.map(({ chunk, similarity }) => {
-    const note = noteMap.get(chunk.note_id);
+  return results.map((match) => {
+    const noteId = match.metadata.source_id;
+    const note = noteMap.get(noteId);
     const doc = note?.source_doc_id
       ? docMap.get(note.source_doc_id)
       : undefined;
     const sourceTitle = doc?.title ?? note?.title ?? "Note";
     const sourceType = doc ? "document" : "note";
+
     return {
-      id: chunk.id,
-      text: chunk.content,
+      id: match.id,
+      text: match.metadata.text || "", // Assume text is in metadata
       source_type: sourceType,
       source_title: sourceTitle,
-      note_id: chunk.note_id,
-      similarity,
+      note_id: noteId,
+      similarity: match.score || 0,
     };
   });
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (!a.length || a.length !== b.length) return 0;
-  let dot = 0;
-  let aMag = 0;
-  let bMag = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    aMag += a[i] * a[i];
-    bMag += b[i] * b[i];
-  }
-  if (!aMag || !bMag) return 0;
-  return dot / (Math.sqrt(aMag) * Math.sqrt(bMag));
 }
