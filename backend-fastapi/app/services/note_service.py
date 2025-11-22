@@ -1,4 +1,5 @@
 """Note service for note operations and reindexing"""
+from typing import Optional
 from app.core.firebase import get_firestore_client
 from app.services.llm_service import LLMService
 from app.services.vector_service import VectorService
@@ -111,7 +112,7 @@ class NoteService:
         
         return chunks
 
-    async def translate_note(self, user_id: str, note_id: str, target_lang: str) -> dict:
+    async def translate_note(self, user_id: str, note_id: str, target_lang: str, model_name: Optional[str] = None) -> dict:
         """
         Translate note content.
         """
@@ -142,7 +143,7 @@ class NoteService:
              return {"translated_text": ""}
 
         # 3. Call LLM
-        translated_text = await self.llm_service.translate_text(source_content, target_lang)
+        translated_text = await self.llm_service.translate_text(source_content, target_lang, model_name=model_name)
         
         # 4. Update Firestore
         field_to_update = "content_md_en" if target_lang == "en" else "content_md_zh"
@@ -150,7 +151,7 @@ class NoteService:
         
         return {"translated_text": translated_text}
 
-    async def extract_terminology(self, user_id: str, note_id: str) -> list:
+    async def extract_terminology(self, user_id: str, note_id: str, model_name: Optional[str] = None) -> list:
         """
         Extract terminology from note.
         """
@@ -169,7 +170,7 @@ class NoteService:
         content = note_data.get("content_md_zh", "") + "\n" + note_data.get("content_md_en", "")
         
         # 3. Call LLM
-        terms = await self.llm_service.extract_terminology(content)
+        terms = await self.llm_service.extract_terminology(content, model_name=model_name)
         
         # 4. Store in Firestore (optional, maybe in a subcollection or field)
         # For now just return them

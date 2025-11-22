@@ -9,6 +9,7 @@ from app.models.notes import (
 )
 from app.services.rag_service import RAGService
 from app.services.note_service import NoteService
+from app.services.user_service import UserService
 from app.core.exceptions import NotFoundError, UnauthorizedError
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -28,12 +29,17 @@ async def ai_qa(
     """
     try:
         rag_service = RAGService()
+        user_service = UserService()
+        
+        # Get user's preferred model
+        model_name = await user_service.get_preferred_model(user.uid)
         
         result = await rag_service.answer_question(
             user_id=user.uid,
             note_id=request.note_id,
             question=request.question,
-            top_k=request.top_k
+            top_k=request.top_k,
+            model_name=model_name
         )
         
         return AIQAResponse(
@@ -84,10 +90,16 @@ async def ai_translate(
     """
     try:
         note_service = NoteService()
+        user_service = UserService()
+        
+        # Get user's preferred model
+        model_name = await user_service.get_preferred_model(user.uid)
+
         result = await note_service.translate_note(
             user_id=user.uid,
             note_id=request.note_id,
-            target_lang=request.target_lang
+            target_lang=request.target_lang,
+            model_name=model_name
         )
         return TranslateResponse(**result)
     except NotFoundError as e:
@@ -108,9 +120,15 @@ async def ai_terminology(
     """
     try:
         note_service = NoteService()
+        user_service = UserService()
+        
+        # Get user's preferred model
+        model_name = await user_service.get_preferred_model(user.uid)
+
         terms = await note_service.extract_terminology(
             user_id=user.uid,
-            note_id=request.note_id
+            note_id=request.note_id,
+            model_name=model_name
         )
         return TerminologyResponse(terms=[TerminologyItem(**t) for t in terms])
     except NotFoundError as e:

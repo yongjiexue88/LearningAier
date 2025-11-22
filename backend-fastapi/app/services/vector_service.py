@@ -62,7 +62,7 @@ class VectorService:
                 Example: [{"id": "chunk_1", "values": [...], "metadata": {"user_id": "..."}}]
         """
         if self.settings.vector_db_provider == "pinecone":
-            self.index.upsert(vectors=vectors)
+            self.index.upsert(vectors=vectors, namespace="")
     
     async def query_vectors(
         self,
@@ -86,7 +86,8 @@ class VectorService:
                 vector=query_vector,
                 top_k=top_k,
                 filter=filter,
-                include_metadata=True
+                include_metadata=True,
+                namespace=""
             )
             
             return [
@@ -111,4 +112,11 @@ class VectorService:
             filter: Metadata filter dict
         """
         if self.settings.vector_db_provider == "pinecone":
-            self.index.delete(filter=filter)
+            try:
+                self.index.delete(filter=filter, namespace="")
+            except Exception as e:
+                # Ignore "namespace not found" errors (happens when namespace is empty)
+                if "namespace not found" in str(e).lower():
+                    pass  # Nothing to delete if namespace doesn't exist yet
+                else:
+                    raise  # Re-raise other errors

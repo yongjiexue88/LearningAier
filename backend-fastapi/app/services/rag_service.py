@@ -24,7 +24,8 @@ class RAGService:
         user_id: str,
         note_id: Optional[str],
         question: str,
-        top_k: int = 5
+        top_k: int = 5,
+        model_name: Optional[str] = None
     ) -> RAGResult:
         """
         RAG-based question answering.
@@ -103,7 +104,8 @@ Answer:"""
         answer = await self.llm_service.generate_chat_completion(
             messages=messages,
             temperature=0.3,
-            max_tokens=1000
+            max_tokens=1000,
+            model_name=model_name
         )
         
         # Step 5: Return result

@@ -20,7 +20,8 @@ class LLMService:
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        response_format: Optional[Dict[str, Any]] = None
+        response_format: Optional[Dict[str, Any]] = None,
+        model_name: Optional[str] = None
     ) -> str:
         """
         Generate chat completion.
@@ -29,7 +30,9 @@ class LLMService:
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            max_tokens: Maximum tokens to generate
             response_format: Optional JSON schema for structured output
+            model_name: Optional model name to override default
             
         Returns:
             Generated text response
@@ -47,7 +50,12 @@ class LLMService:
                 generation_config["response_mime_type"] = "application/json"
                 generation_config["response_schema"] = response_format
             
-            response = await self.chat_model.generate_content_async(
+            # Use specific model if provided, otherwise default
+            model = self.chat_model
+            if model_name:
+                model = genai.GenerativeModel(model_name)
+
+            response = await model.generate_content_async(
                 prompt,
                 generation_config=generation_config
             )
@@ -98,7 +106,7 @@ class LLMService:
         
         raise NotImplementedError(f"Provider {self.settings.embeddings_provider} not implemented")
 
-    async def translate_text(self, text: str, target_lang: str = "en") -> str:
+    async def translate_text(self, text: str, target_lang: str = "en", model_name: Optional[str] = None) -> str:
         """
         Translate text to target language.
         """
@@ -111,9 +119,9 @@ class LLMService:
         """
         
         messages = [{"role": "user", "content": prompt}]
-        return await self.generate_chat_completion(messages)
+        return await self.generate_chat_completion(messages, model_name=model_name)
 
-    async def extract_terminology(self, text: str) -> List[Dict[str, str]]:
+    async def extract_terminology(self, text: str, model_name: Optional[str] = None) -> List[Dict[str, str]]:
         """
         Extract bilingual terminology from text.
         Returns list of dicts with 'term', 'definition', 'translation'.
@@ -148,7 +156,8 @@ class LLMService:
         
         response = await self.generate_chat_completion(
             messages, 
-            response_format=schema
+            response_format=schema,
+            model_name=model_name
         )
         
         import json
@@ -157,7 +166,7 @@ class LLMService:
         except json.JSONDecodeError:
             return []
 
-    async def generate_flashcards(self, text: str, count: int = 5) -> List[Dict[str, str]]:
+    async def generate_flashcards(self, text: str, count: int = 5, model_name: Optional[str] = None) -> List[Dict[str, str]]:
         """
         Generate flashcards from text.
         Returns list of dicts with 'front' and 'back'.
@@ -187,7 +196,8 @@ class LLMService:
         
         response = await self.generate_chat_completion(
             messages, 
-            response_format=schema
+            response_format=schema,
+            model_name=model_name
         )
         
         import json

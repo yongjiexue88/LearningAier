@@ -119,13 +119,20 @@ export function SettingsPage() {
               <MenuItem value="gemini">Google Gemini</MenuItem>
             </TextField>
             <TextField
+              select
               label="Model name"
-              placeholder="gemini-2.5-flash"
+              fullWidth
               value={model}
               onChange={(event) => setModel(event.target.value)}
-              fullWidth
+              helperText="Select the Gemini model to use for AI tasks."
               disabled={loading}
-            />
+            >
+              <MenuItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</MenuItem>
+              <MenuItem value="gemini-2.0-flash">Gemini 2.0 Flash</MenuItem>
+              <MenuItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</MenuItem>
+              <MenuItem value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS</MenuItem>
+              <MenuItem value="gemini-2.5-flash">Gemini 2.5 Flash</MenuItem>
+            </TextField>
             <TextField
               label="Preferred language"
               placeholder="Auto-detect"
