@@ -34,8 +34,9 @@ class Settings(BaseSettings):
     # Vector DB (Pinecone)
     vector_db_provider: str = "pinecone"
     pinecone_api_key: str
-    pinecone_environment: str = "us-east-1"
+    pinecone_environment: Optional[str] = None  # Optional for modern Pinecone (v3+)
     pinecone_index_name: str = "learningaier-chunks"
+    pinecone_index_host: Optional[str] = None  # Optional index host URL
     
     class Config:
         env_file = ".env.local"

@@ -22,8 +22,14 @@ class VectorService:
         if self.settings.vector_db_provider == "pinecone":
             self.pc = Pinecone(api_key=self.settings.pinecone_api_key)
             
-            # Ensure index exists
+            # Ensure index exists (only create if needed)
             if self.settings.pinecone_index_name not in self.pc.list_indexes().names():
+                # Only need environment when creating a new serverless index
+                if not self.settings.pinecone_environment:
+                    raise ValueError(
+                        "PINECONE_ENVIRONMENT is required when creating a new index. "
+                        "Either provide it or create the index manually in Pinecone console."
+                    )
                 self.pc.create_index(
                     name=self.settings.pinecone_index_name,
                     dimension=self.settings.embeddings_dimensions,
@@ -34,7 +40,15 @@ class VectorService:
                     )
                 )
             
-            self.index = self.pc.Index(self.settings.pinecone_index_name)
+            # Connect to index (modern Pinecone client uses host automatically)
+            if self.settings.pinecone_index_host:
+                self.index = self.pc.Index(
+                    self.settings.pinecone_index_name,
+                    host=self.settings.pinecone_index_host
+                )
+            else:
+                # Client will fetch host automatically from Pinecone
+                self.index = self.pc.Index(self.settings.pinecone_index_name)
     
     async def upsert_vectors(
         self,

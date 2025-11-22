@@ -18,18 +18,28 @@ def get_firebase_app():
         try:
             cred_json = base64.b64decode(settings.firebase_credentials_json).decode()
         except Exception:
+            # Not base64, treat as direct JSON string
             cred_json = settings.firebase_credentials_json
         
-        cred_dict = json.loads(cred_json)
-        cred = credentials.Certificate(cred_dict)
-    else:
-        # Use individual fields
+        try:
+            cred_dict = json.loads(cred_json)
+            cred = credentials.Certificate(cred_dict)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse FIREBASE_CREDENTIALS_JSON: {e}")
+    elif settings.firebase_client_email and settings.firebase_private_key:
+        # Use individual fields (fallback)
         cred = credentials.Certificate({
             "type": "service_account",
             "project_id": settings.firebase_project_id,
             "client_email": settings.firebase_client_email,
-            "private_key": settings.firebase_private_key.replace("\\n", "\n"),
+            "private_key": settings.firebase_private_key.replace("\\\\n", "\\n"),
+            "token_uri": "https://oauth2.googleapis.com/token",
         })
+    else:
+        raise ValueError(
+            "Firebase credentials not configured. Set FIREBASE_CREDENTIALS_JSON "
+            "or both FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in .env.local"
+        )
     
     return firebase_admin.initialize_app(cred, {
         "storageBucket": settings.firebase_storage_bucket
