@@ -57,7 +57,7 @@ export function NoteAIActions({ noteId }: NoteAIActionsProps) {
     const handleTranslate = (targetLanguage: "zh" | "en") => {
         translate.mutate({
             note_id: noteId,
-            target_language: targetLanguage,
+            target_lang: targetLanguage,
         });
     };
 

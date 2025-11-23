@@ -16,7 +16,7 @@ import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
 import PreviewIcon from "@mui/icons-material/PreviewRounded";
 import RefreshIcon from "@mui/icons-material/RefreshRounded";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeftRounded";
+
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolderRounded";
 import {
   Alert,
@@ -1058,7 +1058,7 @@ export function NotesPage() {
           term: card.term ?? null,
           definition: card.definition ?? "",
           context: card.context ?? null,
-          category: card.category ?? "vocabulary",
+          category: "vocabulary",
         })) ?? [];
       if (!generated.length) {
         showSnackbar("No flashcards generated. Try adjusting the note content.", "info");
