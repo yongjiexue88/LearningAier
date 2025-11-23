@@ -24,5 +24,5 @@ ENV PORT=8080
 RUN useradd -m appuser
 USER appuser
 
-# 8) Start FastAPI with uvicorn
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# 8) Start FastAPI with uvicorn - use PORT env var for Cloud Run
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080}"

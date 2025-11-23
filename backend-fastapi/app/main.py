@@ -3,18 +3,31 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.api import notes, documents, flashcards
-from app.core.firebase import get_firebase_app
 import time
 import json
 
-# Initialize Firebase on startup
-get_firebase_app()
 
 app = FastAPI(
     title="LearningAier API",
     description="AI-powered note-taking and flashcard backend with RAG",
     version="2.0.0"
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Log startup information"""
+    settings = get_settings()
+    print("="*80)
+    print("🚀 LearningAier API Starting Up")
+    print("="*80)
+    print(f"📍 Environment: {settings.app_env}")
+    print(f"🔌 Port: {settings.port}")
+    print(f"🔥 Firebase Project: {settings.firebase_project_id}")
+    print(f"🤖 LLM Provider: {settings.llm_provider}")
+    print(f"🤖 LLM Model: {settings.llm_model}")
+    print(f"📊 Vector DB: {settings.vector_db_provider}")
+    print("="*80)
+
 
 # CORS middleware
 app.add_middleware(

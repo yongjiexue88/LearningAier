@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # Server
     app_env: str = "local"
-    port: int = 8787
+    port: int = 8080  # Default to 8080 for Cloud Run compatibility
     
     # Firebase
     firebase_project_id: str
