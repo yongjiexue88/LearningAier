@@ -41,7 +41,22 @@ jobs:
           # Get the latest build ID
           BUILD_ID=$(gcloud builds list --limit=1 --format="value(id)")
           echo "Waiting for build $BUILD_ID to complete..."
-          gcloud builds wait $BUILD_ID
+          
+          # Poll until build completes
+          while true; do
+            STATUS=$(gcloud builds describe $BUILD_ID --format="value(status)")
+            echo "Build status: $STATUS"
+            
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Build completed successfully!"
+              break
+            elif [ "$STATUS" = "FAILURE" ] || [ "$STATUS" = "TIMEOUT" ] || [ "$STATUS" = "CANCELLED" ]; then
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+            
+            sleep 10
+          done
 
       - name: Deploy to Cloud Run
         run: |
@@ -50,6 +65,8 @@ jobs:
             --platform managed \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
+            --timeout=300 \
+            --cpu-boost \
             --set-env-vars "APP_ENV=production" \
             --set-env-vars "FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" \
             --set-env-vars "FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" \
