@@ -125,10 +125,8 @@ interface NoteProcessorSummary {
     en: { title: string; children: string[] }[];
   };
   terminology: {
-    term_zh: string | null;
-    term_en: string | null;
-    definition_zh: string;
-    definition_en: string;
+    term: string;
+    definition: string;
   }[];
 }
 
@@ -155,14 +153,8 @@ export function noteProcessorResultToMarkdown(
   if (terminology.length) {
     lines.push(`# Terminology`);
     terminology.forEach((term) => {
-      const termLabel =
-        language === "zh"
-          ? term.term_zh ?? term.term_en ?? "术语"
-          : term.term_en ?? term.term_zh ?? "Term";
-      const def =
-        language === "zh" ? term.definition_zh : term.definition_en;
-      lines.push(`### ${termLabel}`);
-      lines.push(def);
+      lines.push(`### ${term.term}`);
+      lines.push(term.definition);
       lines.push("");
     });
   }

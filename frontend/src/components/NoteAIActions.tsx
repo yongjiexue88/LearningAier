@@ -185,7 +185,7 @@ export function NoteAIActions({ noteId }: NoteAIActionsProps) {
                                     }}
                                 >
                                     <Typography variant="body2">
-                                        <strong>{term.term_zh}</strong> | {term.term_en}
+                                        <strong>{term.term}</strong> | {term.definition}
                                     </Typography>
                                     <Typography variant="caption" color="text.secondary">
                                         {term.definition}

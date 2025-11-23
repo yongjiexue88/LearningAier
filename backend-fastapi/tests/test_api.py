@@ -6,14 +6,18 @@ def test_health_check(client):
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
 
+@patch("app.api.notes.UserService")
 @patch("app.api.notes.RAGService")
-def test_ai_qa(mock_rag_cls, client):
-    # Setup Mock with async method
+def test_ai_qa(mock_rag_cls, mock_user_cls, client):
+    # Setup Mock
     mock_rag = mock_rag_cls.return_value
     mock_rag.answer_question = AsyncMock(return_value=MagicMock(
         answer="Test Answer",
         sources=[]
     ))
+    
+    mock_user = mock_user_cls.return_value
+    mock_user.get_preferred_model = AsyncMock(return_value="gemini-1.5-flash")
     
     # Test
     response = client.post(
@@ -26,11 +30,15 @@ def test_ai_qa(mock_rag_cls, client):
     data = response.json()
     assert data["answer"] == "Test Answer"
 
+@patch("app.api.notes.UserService")
 @patch("app.api.notes.NoteService")
-def test_ai_translate(mock_note_cls, client):
-    # Setup Mock with async method
+def test_ai_translate(mock_note_cls, mock_user_cls, client):
+    # Setup Mock
     mock_note = mock_note_cls.return_value
     mock_note.translate_note = AsyncMock(return_value={"translated_text": "Translated Text"})
+    
+    mock_user = mock_user_cls.return_value
+    mock_user.get_preferred_model = AsyncMock(return_value="gemini-1.5-flash")
     
     # Test
     response = client.post(
@@ -42,13 +50,17 @@ def test_ai_translate(mock_note_cls, client):
     assert response.status_code == 200
     assert response.json()["translated_text"] == "Translated Text"
 
+@patch("app.api.notes.UserService")
 @patch("app.api.notes.NoteService")
-def test_ai_terminology(mock_note_cls, client):
-    # Setup Mock with async method
+def test_ai_terminology(mock_note_cls, mock_user_cls, client):
+    # Setup Mock
     mock_note = mock_note_cls.return_value
     mock_note.extract_terminology = AsyncMock(return_value=[
-        {"term": "AI", "definition": "Artificial Intelligence", "translation": "人工智能"}
+        {"term": "AI", "definition": "Artificial Intelligence"}
     ])
+    
+    mock_user = mock_user_cls.return_value
+    mock_user.get_preferred_model = AsyncMock(return_value="gemini-1.5-flash")
     
     # Test
     response = client.post(

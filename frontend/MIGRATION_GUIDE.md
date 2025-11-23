@@ -119,7 +119,7 @@ translateNote.mutate(
 **Before:**
 ```typescript
 const data = await callFunction<{
-  terms: Array<{ term_zh: string; term_en: string; definition: string }>;
+  terms: Array<{ term: string; definition: string }>;
 }>(\"ai-notes-terminology\", { text: noteDraft.content });
 ```
 

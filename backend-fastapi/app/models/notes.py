@@ -58,7 +58,6 @@ class TerminologyItem(BaseModel):
     """Single terminology item"""
     term: str
     definition: str
-    translation: str
 
 
 class TerminologyResponse(BaseModel):

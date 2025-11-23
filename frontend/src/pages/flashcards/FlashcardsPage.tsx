@@ -72,12 +72,9 @@ interface FlashcardRecord {
   note_id?: string | null;
   document_id?: string | null;
   set_id?: string | null;
-  term_zh?: string | null;
-  term_en?: string | null;
-  definition_zh: string;
-  definition_en: string;
-  context_zh?: string | null;
-  context_en?: string | null;
+  term?: string | null;
+  definition: string;
+  context?: string | null;
   category: FlashcardCategory;
   next_due_at?: string | null;
   created_at?: string;
@@ -320,12 +317,9 @@ export function FlashcardsPage() {
         user_id: userId,
         note_id: selectedNoteId || null,
         document_id: null,
-        term_en: newFlashcard.term || null,
-        term_zh: newFlashcard.term || null,
-        definition_en: newFlashcard.definition,
-        definition_zh: newFlashcard.definition,
-        context_en: newFlashcard.context || null,
-        context_zh: newFlashcard.context || null,
+        term: newFlashcard.term || null,
+        definition: newFlashcard.definition,
+        context: newFlashcard.context || null,
         category: newFlashcard.category,
         next_due_at: now,
         created_at: now,
@@ -590,7 +584,7 @@ export function FlashcardsPage() {
                 </Typography>
                 <Typography variant="h5" gutterBottom>
                   {activeCard
-                    ? activeCard.term_en || activeCard.term_zh || "Untitled term"
+                    ? activeCard.term || "Untitled term"
                     : "No cards due"}
                 </Typography>
               </Box>
@@ -598,9 +592,9 @@ export function FlashcardsPage() {
             </Stack>
             {activeCard ? (
               <Stack spacing={1}>
-                {activeCard.context_en || activeCard.context_zh ? (
+                {activeCard.context ? (
                   <Typography variant="body2" color="text.secondary">
-                    {activeCard.context_en || activeCard.context_zh}
+                    {activeCard.context}
                   </Typography>
                 ) : null}
                 <Typography variant="subtitle2" color="text.secondary">
@@ -613,10 +607,7 @@ export function FlashcardsPage() {
                 {activeAnswerShown ? (
                   <Stack spacing={1}>
                     <Typography variant="body1">
-                      {activeCard.definition_en}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                      {activeCard.definition_zh}
+                      {activeCard.definition}
                     </Typography>
                   </Stack>
                 ) : (
@@ -803,16 +794,13 @@ export function FlashcardsPage() {
                     }}
                   >
                     <TableCell sx={{ maxWidth: 180 }}>
-                      <Typography variant="body2" noWrap title={card.term_en ?? card.term_zh ?? ""}>
-                        {card.term_en || card.term_zh || "—"}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {card.category.toUpperCase()}
+                      <Typography variant="body2" noWrap title={card.term ?? ""}>
+                        {card.term || "—"}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ maxWidth: 240 }}>
-                      <Typography variant="body2" noWrap title={card.definition_en}>
-                        {card.definition_en}
+                    <TableCell>
+                      <Typography variant="body2" noWrap title={card.definition}>
+                        {card.definition}
                       </Typography>
                     </TableCell>
                     <TableCell>

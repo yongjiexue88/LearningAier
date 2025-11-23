@@ -47,8 +47,7 @@ export interface ExtractTerminologyRequest {
 }
 
 export interface TerminologyItem {
-    term_zh: string;
-    term_en: string;
+    term: string;
     definition: string;
 }
 

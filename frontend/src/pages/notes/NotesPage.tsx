@@ -209,12 +209,9 @@ interface FlashcardRecord {
   set_id?: string | null;
   note_id?: string | null;
   document_id?: string | null;
-  term_zh: string | null;
-  term_en: string | null;
-  definition_zh: string;
-  definition_en: string;
-  context_zh: string | null;
-  context_en: string | null;
+  term: string | null;
+  definition: string;
+  context: string | null;
   category: string;
   created_at: string;
 }
@@ -1030,12 +1027,9 @@ export function NotesPage() {
           set_id: null,
           note_id: selectedNoteId,
           document_id: null,
-          term_zh: null,
-          term_en: null,
-          definition_zh: card.back || "",
-          definition_en: card.back || "",
-          context_zh: null,
-          context_en: null,
+          term: null,
+          definition: card.back || "",
+          context: null,
           category: "definition",
         })) ?? [];
       if (!generated.length) {
@@ -1081,12 +1075,9 @@ export function NotesPage() {
           id: newDocRef.id,
           note_id: selectedNoteId,
           document_id: null,
-          term_en: card.term_en ?? card.term_zh ?? null,
-          term_zh: card.term_zh ?? null,
-          definition_en: card.definition_en,
-          definition_zh: card.definition_zh,
-          context_en: card.context_en ?? card.context_zh ?? null,
-          context_zh: card.context_zh ?? null,
+          term: card.term ?? null,
+          definition: card.definition,
+          context: card.context ?? null,
           category: card.category ?? "definition",
           created_at: now,
         };
@@ -1192,13 +1183,10 @@ export function NotesPage() {
       `Study Assistant – ${noteDetail.title}`
     );
     latestFlashcards.forEach((card) => {
-      const front =
-        card.term_en || card.term_zh || card.definition_en.slice(0, 60);
+      const front = card.term || card.definition.slice(0, 60);
       const back = [
-        `<strong>${card.term_en ?? ""}</strong>`,
-        `<p>${card.definition_en}</p>`,
-        `<hr/>`,
-        `<p>${card.definition_zh}</p>`,
+        `<strong>${card.term ?? ""}</strong>`,
+        `<p>${card.definition}</p>`,
       ].join("");
       exporter.addCard(front, back);
     });
@@ -2056,7 +2044,7 @@ export function NotesPage() {
                     primary={
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography variant="subtitle1">
-                          {card.term_en ?? card.term_zh ?? "Term"}
+                          {card.term ?? "Term"}
                         </Typography>
                         <Chip
                           label={(card.category ?? "definition").toUpperCase()}
@@ -2067,11 +2055,11 @@ export function NotesPage() {
                     secondary={
                       <Stack spacing={0.5}>
                         <Typography variant="body2" color="text.primary">
-                          {card.definition_en ?? card.definition_zh}
+                          {card.definition}
                         </Typography>
-                        {card.context_en || card.context_zh ? (
+                        {card.context ? (
                           <Typography variant="caption" color="text.secondary">
-                            {card.context_en ?? card.context_zh}
+                            {card.context}
                           </Typography>
                         ) : null}
                       </Stack>
@@ -2129,12 +2117,8 @@ export function NotesPage() {
             {latestFlashcards.map((card) => (
               <ListItem key={card.id}>
                 <ListItemText
-                  primary={`${card.category.toUpperCase()}: ${card.term_en ?? card.term_zh ?? "Term"
-                    }`}
-                  secondary={`${card.definition_en.slice(
-                    0,
-                    80
-                  )} / ${card.definition_zh.slice(0, 80)}`}
+                  primary={`${card.category.toUpperCase()}: ${card.term ?? "Term"}`}
+                  secondary={`${card.definition.slice(0, 80)}`}
                 />
               </ListItem>
             ))}

@@ -130,11 +130,10 @@ class LLMService:
         For each term, provide:
         - The term itself
         - A brief definition (in the same language as the text)
-        - The translation (English if text is non-English, or vice versa)
         
         Output JSON format:
         [
-            {"term": "...", "definition": "...", "translation": "..."}
+            {"term": "...", "definition": "..."}
         ]
         """
         
@@ -147,10 +146,9 @@ class LLMService:
                 "type": "object",
                 "properties": {
                     "term": {"type": "string"},
-                    "definition": {"type": "string"},
-                    "translation": {"type": "string"}
+                    "definition": {"type": "string"}
                 },
-                "required": ["term", "definition", "translation"]
+                "required": ["term", "definition"]
             }
         }
         
