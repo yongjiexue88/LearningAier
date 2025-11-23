@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { useState, useCallback } from "react";
 import { firebaseAuth, firebaseStorage, firebaseDb } from "../../lib/firebaseClient";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable } from "firebase/storage";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 
@@ -37,7 +37,6 @@ export function DocumentsPage() {
       setUploadStatus("idle");
       setErrorMessage("");
       setSummaryZh("");
-      setSummaryEn("");
     } else {
       setErrorMessage("Please select a PDF file");
     }
@@ -55,7 +54,6 @@ export function DocumentsPage() {
       setUploadStatus("idle");
       setErrorMessage("");
       setSummaryZh("");
-      setSummaryEn("");
     } else {
       setErrorMessage("Please drop a PDF file");
     }
@@ -122,7 +120,6 @@ export function DocumentsPage() {
                 // Set the text preview as summary
                 // In a real implementation, you'd call a separate summarization endpoint
                 setSummaryZh(data.text_preview);
-                setSummaryEn("Summary generation pending (requires separate API call)");
               },
               onError: (error) => {
                 setErrorMessage(`Processing failed: ${error.message}`);
@@ -144,7 +141,6 @@ export function DocumentsPage() {
     setUploadStatus("idle");
     setErrorMessage("");
     setSummaryZh("");
-    setSummaryEn("");
     setDocumentId(null);
     setNoteId(null);
     setUploadProgress(0);
