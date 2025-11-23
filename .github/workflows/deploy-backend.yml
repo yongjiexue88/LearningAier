@@ -56,6 +56,13 @@ jobs:
             sleep 10
           done
 
+      - name: Prepare Secrets
+        id: secrets
+        env:
+          FIREBASE_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
+        run: |
+          echo "FIREBASE_CREDENTIALS_BASE64=$(echo "$FIREBASE_JSON" | base64 -w 0)" >> $GITHUB_OUTPUT
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
@@ -68,7 +75,7 @@ jobs:
             --set-env-vars "APP_ENV=production" \
             --set-env-vars "FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" \
             --set-env-vars "FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" \
-            --set-env-vars "FIREBASE_CREDENTIALS_JSON=${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}" \
+            --set-env-vars "FIREBASE_CREDENTIALS_JSON=${{ steps.secrets.outputs.FIREBASE_CREDENTIALS_BASE64 }}" \
             --set-env-vars "LLM_PROVIDER=gemini" \
             --set-env-vars "LLM_MODEL=gemini-2.0-flash-lite" \
             --set-env-vars "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" \
