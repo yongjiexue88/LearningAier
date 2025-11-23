@@ -2,103 +2,45 @@
 
 ## System Architecture Diagram
 
-```mermaid
-flowchart TB
-    subgraph Client["Client Layer"]
-        Browser["🌐 Web Browser<br/>(Chrome, Safari, etc.)"]
-    end
+```
++-----------------------+                 +--------------------------------+
+|       User Browser    |                 |          Google Cloud          |
+|  - React + Vite + MUI |                 |                                |
+|  - Firebase Web SDK   |                 |  +-------------------------+   |
++-----------+-----------+                 |  |    Cloud Run (Backend)  |   |
+            |                             |  |  FastAPI + Python       |   |
+            |  HTTPS                      |  |  - REST /api/*          |   |
+            v                             |  |  - Firebase Admin SDK   |   |
++---------------------------+             |  |  - Firestore client     |   |
+|     Firebase Hosting      |             |  |  - Storage client       |   |
+|  (Static frontend assets) |             |  |  - Chroma (embedded)    |   |
++---------------------------+             |  |  - LLM API client       |   |
+            ^                             |  +----------+-------------+    |
+            |                             |             |                  |
+            |                             |    Firestore| / Storage        |
+            |                             |             v                  |
+            |                             |  +-------------------------+   |
+            |                             |  |  Firestore (NoSQL DB)   |   |
+            |                             |  +-------------------------+   |
+            |                             |  +-------------------------+   |
+            |                             |  | Cloud Storage (PDFs)    |   |
+            |                             |  +-------------------------+   |
+            |                             +--------------------------------+
+            |
+            |  Auth (ID token)
+            v
++---------------------------+
+|      Firebase Auth        |
+|  (Email/password, etc.)   |
++---------------------------+
 
-    subgraph Frontend["Frontend Layer<br/>(Local: 5173)"]
-        React["⚛️ React + Vite<br/>TypeScript"]
-        TanStack["🔄 TanStack Query<br/>(React Query)"]
-        MUI["🎨 Material UI<br/>Components"]
-        ReactRouter["🛣️ React Router<br/>Navigation"]
-    end
 
-    subgraph Backend["Backend Layer<br/>(Local: 8787)"]
-        FastAPI["🚀 FastAPI<br/>Python 3.11+"]
-        Auth["🔐 Auth Middleware<br/>(Firebase ID Token)"]
-        
-        subgraph API["API Routes"]
-            NotesAPI["📝 /api/notes"]
-            DocsAPI["📄 /api/documents"]
-            FlashcardsAPI["🎴 /api/flashcards"]
-        end
-        
-        subgraph Services["Business Logic"]
-            LLMService["🤖 LLM Service<br/>(Gemini)"]
-            VectorService["🔍 Vector Service<br/>(Pinecone)"]
-            RAGService["📚 RAG Service<br/>(Q&A Pipeline)"]
-            PDFService["📑 PDF Parser"]
-            NoteService["📝 Note Service"]
-            DocService["📄 Document Service"]
-        end
-    end
-
-    subgraph GoogleCloud["Google Cloud Platform"]
-        subgraph Firebase["Firebase Services"]
-            FirebaseAuth["🔑 Firebase Authentication<br/>(User Identity)"]
-            Firestore["🗄️ Firestore Database<br/>(NoSQL)"]
-            CloudStorage["💾 Cloud Storage<br/>(Files & PDFs)"]
-        end
-        
-        GeminiAPI["🧠 Google Gemini API<br/>(LLM & Embeddings)"]
-    end
-
-    subgraph External["External Services"]
-        Pinecone["📊 Pinecone<br/>(Vector Database)<br/>Index: learningaier-chunks"]
-    end
-
-    %% Client to Frontend
-    Browser -->|HTTP/HTTPS| React
-
-    %% Frontend Components
-    React --> TanStack
-    React --> MUI
-    React --> ReactRouter
-    
-    %% Frontend to Backend
-    TanStack -->|"REST API<br/>Bearer Token"| FastAPI
-    
-    %% Backend Flow
-    FastAPI --> Auth
-    Auth -->|"Verify Token"| FirebaseAuth
-    Auth --> API
-    
-    %% API to Services
-    NotesAPI --> NoteService
-    NotesAPI --> RAGService
-    DocsAPI --> DocService
-    FlashcardsAPI --> NoteService
-    
-    %% Services to External
-    NoteService --> Firestore
-    DocService --> Firestore
-    DocService --> CloudStorage
-    DocService --> PDFService
-    
-    RAGService --> VectorService
-    RAGService --> LLMService
-    
-    LLMService -->|"Chat & Embeddings"| GeminiAPI
-    VectorService -->|"Similarity Search"| Pinecone
-    
-    %% Storage connections
-    CloudStorage -.->|"PDF Files"| PDFService
-    Firestore -.->|"Notes, Documents,<br/>Flashcards"| Services
-
-    %% Styling
-    classDef frontend fill:#61DAFB,stroke:#282C34,stroke-width:2px,color:#000
-    classDef backend fill:#009688,stroke:#004D40,stroke-width:2px,color:#fff
-    classDef firebase fill:#FFA000,stroke:#F57C00,stroke-width:2px,color:#000
-    classDef external fill:#7C4DFF,stroke:#5E35B1,stroke-width:2px,color:#fff
-    classDef client fill:#E0E0E0,stroke:#9E9E9E,stroke-width:2px,color:#000
-
-    class Browser,Client client
-    class React,TanStack,MUI,ReactRouter frontend
-    class FastAPI,Auth,NotesAPI,DocsAPI,FlashcardsAPI,LLMService,VectorService,RAGService,PDFService,NoteService,DocService backend
-    class FirebaseAuth,Firestore,CloudStorage,GeminiAPI firebase
-    class Pinecone external
+Outside GCP:
++-------------------------------------------+
+|  LLM Provider API (e.g. Gemini / OpenAI)  |
+|  - Chat / completion                      |
+|  - Embeddings                             |
++-------------------------------------------+
 ```
 
 ## Architecture Overview
@@ -146,7 +88,7 @@ flowchart TB
 
 #### Google AI
 - **Gemini API**:
-  - Model: `gemini-2.0-flash-exp` (chat & generation)
+  - Model: User selectable (default: `gemini-2.0-flash-lite`)
   - Embeddings: `text-embedding-004` (768 dimensions)
 
 ### **External Services**
@@ -199,7 +141,7 @@ User uploads PDF → Frontend → Cloud Storage (store file)
 
 ### Backend
 - **FastAPI** 0.115 - Web framework
-- **Python** 3.11+ - Runtime
+- **Python** 3.9+ - Runtime
 - **Pydantic** - Request/response validation
 - **Firebase Admin SDK** - Server-side Firebase integration
 - **PyPDF2** - PDF text extraction

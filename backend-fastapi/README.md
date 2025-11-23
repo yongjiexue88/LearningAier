@@ -211,24 +211,142 @@ PYTHONPATH=. pytest -v
 
 ### Docker (Recommended)
 
-```dockerfile
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY app/ ./app/
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8787"]
-```
+### Docker (Recommended)
 
-### Google Cloud Run
+1. **Build the image:**
+   ```bash
+   docker build -t learningaier-backend .
+   ```
+
+2. **Run locally (passing environment variables):**
+   ```bash
+   docker run -p 8080:8080 --env-file .env.local learningaier-backend
+   ```
+   *Note: Ensure your `.env.local` file exists and contains all required credentials.*
+
+### Google Cloud Run Deployment Guide
+
+This guide details how to deploy the FastAPI backend to Google Cloud Run, a serverless container platform.
+
+#### 1. Prerequisites
+- **Google Cloud CLI (`gcloud`)**: Installed and authenticated.
+- **Billing Enabled**: You must enable billing for your Google Cloud project.
+  - *Error if missing*: `FAILED_PRECONDITION: Billing account for project ... is not found.`
+  - *Fix*: Go to [Google Cloud Billing](https://console.cloud.google.com/billing) and link a billing account.
+
+#### 2. Initial Setup
+Run these commands once to set up your environment.
 
 ```bash
+# Login to Google Cloud
+gcloud auth login
+
+# Set your project ID
+gcloud config set project learningaier
+
+# Set your preferred region
+gcloud config set run/region us-central1
+
+# Enable required APIs
+# - run.googleapis.com: For Cloud Run
+# - artifactregistry.googleapis.com: To store Docker images
+# - cloudbuild.googleapis.com: To build images in the cloud
+gcloud services enable \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  cloudbuild.googleapis.com \
+  firestore.googleapis.com \
+  storage.googleapis.com
+```
+
+#### 3. Build and Push Docker Image
+We use Cloud Build to build the Docker image and push it to the Google Container Registry (GCR).
+
+```bash
+# Submit a build to Cloud Build
+# --tag: Specifies the image name and location (gcr.io/PROJECT_ID/IMAGE_NAME)
+gcloud builds submit --tag gcr.io/learningaier/backend-api
+```
+
+#### 4. Prepare Environment Variables
+Cloud Run needs your secrets (API keys, credentials). We use a YAML file to pass them securely.
+
+1. Create a file named `env.yaml` (do NOT commit this to Git).
+2. Add your variables. **Important**: All values must be strings (quote numbers).
+
+**`env.yaml` example:**
+```yaml
+APP_ENV: production
+FIREBASE_PROJECT_ID: learningaier
+FIREBASE_STORAGE_BUCKET: learningaier.firebasestorage.app
+# Paste your full JSON service account key as a single line string
+FIREBASE_CREDENTIALS_JSON: '{"type":"service_account",...}'
+LLM_PROVIDER: gemini
+LLM_MODEL: gemini-2.0-flash-lite
+LLM_API_KEY: AIzaSy...
+EMBEDDINGS_PROVIDER: gemini
+EMBEDDINGS_MODEL: text-embedding-004
+EMBEDDINGS_API_KEY: AIzaSy...
+EMBEDDINGS_DIMENSIONS: '768'
+VECTOR_DB_PROVIDER: pinecone
+PINECONE_API_KEY: pcsk_...
+PINECONE_INDEX_NAME: learningaier-index
+PINECONE_INDEX_HOST: https://...
+PINECONE_ENVIRONMENT: us-east-1
+```
+
+> **Note**: Do NOT include `PORT` in `env.yaml`. Cloud Run sets this automatically. If you include it, deployment will fail with: `The following reserved env names were provided: PORT`.
+
+#### 5. Deploy to Cloud Run
+Deploy the container image to a Cloud Run service.
+
+```bash
+# Deploy command breakdown:
+# learningaier-api: Name of the Cloud Run service
+# --image: The image we built in Step 3
+# --platform managed: Use the fully managed Cloud Run platform
+# --region: The region to deploy to (us-central1)
+# --allow-unauthenticated: Make the API public (required for frontend access)
+# --env-vars-file: Load environment variables from our yaml file
 gcloud run deploy learningaier-api \
-  --source . \
+  --image gcr.io/learningaier/backend-api \
   --platform managed \
   --region us-central1 \
-  --allow-unauthenticated
+  --allow-unauthenticated \
+  --env-vars-file env.yaml
 ```
+
+#### 6. Verification
+After deployment, you will see a Service URL (e.g., `https://learningaier-api-xyz.run.app`).
+
+Test the health endpoint:
+```bash
+curl https://YOUR_SERVICE_URL/health
+# Output: {"status":"healthy"}
+```
+
+#### 7. Management
+You can manage your service (view logs, update variables, rollback) via the Google Cloud Console:
+- **Dashboard**: [Cloud Run Console](https://console.cloud.google.com/run)
+- **Logs**: [Cloud Logging](https://console.cloud.google.com/logs)
+
+#### Troubleshooting Common Errors
+
+1.  **`FAILED_PRECONDITION: Billing account ... not found`**
+    *   **Cause**: Project has no billing account linked.
+    *   **Fix**: Enable billing in the Google Cloud Console.
+
+2.  **`The following reserved env names were provided: PORT`**
+    *   **Cause**: You included `PORT` in your `env.yaml`.
+    *   **Fix**: Remove `PORT` from `env.yaml`. Cloud Run handles port binding automatically.
+
+3.  **`Environment variable values must be strings`**
+    *   **Cause**: You had a number (e.g., `8080` or `768`) without quotes in YAML.
+    *   **Fix**: Quote all numbers: `PORT: '8080'`, `DIMENSIONS: '768'`.
+
+4.  **`503 Service Unavailable`**
+    *   **Cause**: Application failed to start (crashed).
+    *   **Fix**: Check Cloud Run logs. Common reasons: missing env vars, invalid API keys, or code errors.
 
 ## Migration from Node.js Backend
 
