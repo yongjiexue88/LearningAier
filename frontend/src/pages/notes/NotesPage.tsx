@@ -16,6 +16,8 @@ import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
 import PreviewIcon from "@mui/icons-material/PreviewRounded";
 import RefreshIcon from "@mui/icons-material/RefreshRounded";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeftRounded";
+import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolderRounded";
 import {
   Alert,
   Box,
@@ -385,6 +387,8 @@ export function NotesPage() {
     null
   );
 
+  const hasInitializedFolders = useRef(false);
+
 
   const profileQuery = useQuery({
     enabled: Boolean(userId),
@@ -535,14 +539,38 @@ export function NotesPage() {
     [folders, notesByFolder]
   );
 
+  // Log folder information for debugging/cleanup
   useEffect(() => {
+    if (folders.length > 0) {
+      console.log('[Folders Debug] All folders in Firestore:',
+        folders.map(f => ({
+          id: f.id,
+          name: f.name,
+          parent_id: f.parent_id,
+          noteCount: notesByFolder[f.id] || 0
+        }))
+      );
+      console.log('[Folders Debug] Folders in tree (visible in sidebar):', folderTree.length);
+    }
+  }, [folders, folderTree.length, notesByFolder]);
+
+  useEffect(() => {
+    // Reset selectedFolderId if it references a deleted folder
+    if (selectedFolderId && !folders.find(f => f.id === selectedFolderId)) {
+      setSelectedFolderId(null);
+    }
+
+    // Set to first folder if none selected
     if (!selectedFolderId && folders.length > 0) {
       setSelectedFolderId(folders[0].id);
     }
-    if (!expandedFolders.size && folders.length) {
+
+    // Only auto-expand folders on initial load, not when user manually collapses them
+    if (!hasInitializedFolders.current && folders.length > 0) {
       setExpandedFolders(new Set(folders.map((folder) => folder.id)));
+      hasInitializedFolders.current = true;
     }
-  }, [folders, selectedFolderId, expandedFolders.size]);
+  }, [folders, selectedFolderId]);
 
   useEffect(() => {
     if (!selectedFolderId) return;
@@ -989,7 +1017,7 @@ export function NotesPage() {
     try {
       const data = await translateNote.mutateAsync({
         note_id: selectedNoteId,
-        target_language: targetLanguage,
+        target_lang: targetLanguage,
         content: sourceText,
       });
       setNoteDraft((prev) => ({
@@ -1395,25 +1423,26 @@ export function NotesPage() {
 
       <Stack spacing={2}>
         <Paper sx={{ p: 2, borderRadius: 2, boxShadow: "0 6px 18px rgba(0,0,0,0.04)" }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1}>
-            <Typography variant="subtitle1" fontWeight={700}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+            <Typography variant="subtitle2" fontWeight={700}>
               Folders
             </Typography>
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                setFolderDialog({
-                  mode: "create",
-                  open: true,
-                  name: "",
-                  parentId: selectedFolderId,
-                })
-              }
-            >
-              New folder
-            </Button>
+            <Tooltip title="Create folder">
+              <IconButton
+                size="small"
+                color="primary"
+                onClick={() =>
+                  setFolderDialog({
+                    mode: "create",
+                    open: true,
+                    name: "",
+                    parentId: null,
+                  })
+                }
+              >
+                <CreateNewFolderIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Stack>
           <Divider sx={{ mb: 1 }} />
           <Box sx={{ maxHeight: 360, overflow: "auto" }}>
@@ -1424,9 +1453,26 @@ export function NotesPage() {
             ) : folderTree.length ? (
               renderFolderNodes(folderTree)
             ) : (
-              <Typography variant="body2" color="text.secondary">
-                Create folders to organize your notes.
-              </Typography>
+              <Stack spacing={2} alignItems="center" sx={{ py: 3 }}>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Create folders to organize your notes.
+                </Typography>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<CreateNewFolderIcon />}
+                  onClick={() =>
+                    setFolderDialog({
+                      mode: "create",
+                      open: true,
+                      name: "",
+                      parentId: null,
+                    })
+                  }
+                >
+                  Create First Folder
+                </Button>
+              </Stack>
             )}
           </Box>
         </Paper>
@@ -1914,6 +1960,20 @@ export function NotesPage() {
           onClick={() => {
             const folder = folders.find((f) => f.id === folderMenu.folderId);
             setFolderDialog({
+              mode: "create",
+              open: true,
+              name: "",
+              parentId: folder?.id ?? null,
+            });
+            setFolderMenu({ anchor: null });
+          }}
+        >
+          <CreateNewFolderIcon fontSize="small" sx={{ mr: 1 }} /> Create Folder
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const folder = folders.find((f) => f.id === folderMenu.folderId);
+            setFolderDialog({
               mode: "rename",
               open: true,
               targetId: folder?.id,
@@ -1928,27 +1988,40 @@ export function NotesPage() {
         <MenuItem
           onClick={async () => {
             if (!folderMenu.folderId) return;
-            if (
-              confirm(
-                "Delete folder? Notes inside will also be deleted (cascade)."
-              )
-            ) {
-              try {
-                const folderId = folderMenu.folderId;
-                const folderNotes = notes.filter(
-                  (note) => note.folder_id === folderId
+
+            try {
+              const folderId = folderMenu.folderId;
+              const folderNotes = notes.filter(
+                (note) => note.folder_id === folderId
+              );
+
+              // Prevent deletion if folder contains notes
+              if (folderNotes.length > 0) {
+                showSnackbar(
+                  `Cannot delete folder with ${folderNotes.length} note${folderNotes.length > 1 ? 's' : ''}. Please delete or move the notes first.`,
+                  "error"
                 );
-                await Promise.all(
-                  folderNotes.map((note) =>
-                    deleteDoc(doc(firebaseDb, "notes", note.id))
-                  )
-                );
-                await deleteDoc(doc(firebaseDb, "folders", folderId));
-                queryClient.invalidateQueries({ queryKey: ["folders"] });
-                showSnackbar("Folder deleted", "info");
-              } catch (error: any) {
-                showSnackbar(error?.message ?? "Failed to delete folder", "error");
+                setFolderMenu({ anchor: null });
+                return;
               }
+
+              // Confirm deletion for empty folder
+              if (!confirm("Delete this empty folder?")) {
+                setFolderMenu({ anchor: null });
+                return;
+              }
+
+              await deleteDoc(doc(firebaseDb, "folders", folderId));
+
+              // Reset selection if we deleted the currently selected folder
+              if (selectedFolderId === folderId) {
+                setSelectedFolderId(null);
+              }
+
+              queryClient.invalidateQueries({ queryKey: ["folders"] });
+              showSnackbar("Folder deleted", "info");
+            } catch (error: any) {
+              showSnackbar(error?.message ?? "Failed to delete folder", "error");
             }
             setFolderMenu({ anchor: null });
           }}

@@ -46,7 +46,9 @@ class TranslateRequest(BaseModel):
 
 class TranslateResponse(BaseModel):
     """Response model for note translation"""
-    translated_text: str
+    note_id: str
+    translated_content: str
+    target_language: str
 
 
 class TerminologyRequest(BaseModel):

@@ -8,9 +8,9 @@ import {
 } from "@mui/material";
 
 const quickActions = [
-  { label: "New Note", description: "Start typing bilingual notes" },
-  { label: "Upload PDF", description: "Import and summarize a document" },
-  { label: "Review Flashcards", description: "Stay on top of spaced rep" },
+  { label: "New Note", description: "Start typing bilingual notes", path: "/notes" },
+  { label: "Upload PDF", description: "Import and summarize a document", path: "/documents" },
+  { label: "Review Flashcards", description: "Stay on top of spaced rep", path: "/flashcards" },
 ];
 
 export function DashboardPage() {
@@ -42,7 +42,7 @@ export function DashboardPage() {
               <Typography variant="body2" color="text.secondary" mb={2}>
                 {action.description}
               </Typography>
-              <Button variant="contained" size="small">
+              <Button variant="contained" size="small" href={action.path}>
                 Go
               </Button>
             </CardContent>

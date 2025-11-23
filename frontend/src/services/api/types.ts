@@ -31,7 +31,7 @@ export interface ReindexNoteResponse {
 
 export interface TranslateNoteRequest {
     note_id: string;
-    target_language: "zh" | "en";
+    target_lang: "zh" | "en";
     content?: string;
 }
 

@@ -140,7 +140,11 @@ class NoteService:
             source_content = note_data.get("content_md_zh") or note_data.get("content_md_en")
             
         if not source_content:
-             return {"translated_text": ""}
+             return {
+                 "note_id": note_id,
+                 "translated_content": "",
+                 "target_language": target_lang
+             }
 
         # 3. Call LLM
         translated_text = await self.llm_service.translate_text(source_content, target_lang, model_name=model_name)
@@ -149,7 +153,11 @@ class NoteService:
         field_to_update = "content_md_en" if target_lang == "en" else "content_md_zh"
         note_ref.update({field_to_update: translated_text})
         
-        return {"translated_text": translated_text}
+        return {
+            "note_id": note_id,
+            "translated_content": translated_text,
+            "target_language": target_lang
+        }
 
     async def extract_terminology(self, user_id: str, note_id: str, model_name: Optional[str] = None) -> list:
         """
