@@ -2,255 +2,170 @@
 
 ## System Architecture Diagram
 
-```
-+-----------------------+                 +--------------------------------+
-|       User Browser    |                 |          Google Cloud          |
-|  - React + Vite + MUI |                 |                                |
-|  - Firebase Web SDK   |                 |  +-------------------------+   |
-+-----------+-----------+                 |  |    Cloud Run (Backend)  |   |
-            |                             |  |  FastAPI + Python       |   |
-            |  HTTPS                      |  |  - REST /api/*          |   |
-            v                             |  |  - Firebase Admin SDK   |   |
-+---------------------------+             |  |  - Firestore client     |   |
-|     Firebase Hosting      |             |  |  - Storage client       |   |
-|  (Static frontend assets) |             |  |  - Chroma (embedded)    |   |
-+---------------------------+             |  |  - LLM API client       |   |
-            ^                             |  +----------+-------------+    |
-            |                             |             |                  |
-            |                             |    Firestore| / Storage        |
-            |                             |             v                  |
-            |                             |  +-------------------------+   |
-            |                             |  |  Firestore (NoSQL DB)   |   |
-            |                             |  +-------------------------+   |
-            |                             |  +-------------------------+   |
-            |                             |  | Cloud Storage (PDFs)    |   |
-            |                             |  +-------------------------+   |
-            |                             +--------------------------------+
-            |
-            |  Auth (ID token)
-            v
-+---------------------------+
-|      Firebase Auth        |
-|  (Email/password, etc.)   |
-+---------------------------+
-
-
-Outside GCP:
-+-------------------------------------------+
-|  LLM Provider API (e.g. Gemini / OpenAI)  |
-|  - Chat / completion                      |
-|  - Embeddings                             |
-+-------------------------------------------+
+```mermaid
+graph TB
+    subgraph "Client Layer"
+        Browser["🌐 Web Browser<br/>(React SPA)"]
+    end
+    
+    subgraph "Firebase Hosting"
+        StaticFiles["📦 Static Assets<br/>(HTML, JS, CSS)<br/>Firebase Hosting CDN"]
+    end
+    
+    subgraph "Google Cloud Platform"
+        subgraph "Cloud Run"
+            API["⚡ FastAPI Backend<br/>Port 8080<br/>(Auto-scaling containers)"]
+        end
+        
+        subgraph "Firebase Services"
+            Auth["🔐 Firebase Auth<br/>(OAuth, Email/Password)"]
+            Firestore["🗄️ Firestore<br/>(notes, documents,<br/>flashcards, profiles)"]
+            Storage["📁 Cloud Storage<br/>(PDFs, Images)"]
+        end
+    end
+    
+    subgraph "External Services"
+        Gemini["🤖 Google Gemini API<br/>gemini-2.0-flash-lite<br/>text-embedding-004"]
+        Pinecone["🔍 Pinecone Vector DB<br/>768-dim embeddings<br/>Cosine similarity"]
+    end
+    
+    Browser -->|HTTPS| StaticFiles
+    Browser -->|ID Token in Bearer Header| API
+    Browser -->|Direct SDK Calls| Auth
+    Browser -->|Direct SDK Reads/Writes| Firestore
+    
+    API -->|Verify ID Token| Auth
+    API -->|CRUD Operations| Firestore
+    API -->|Upload/Download Files| Storage
+    API -->|Chat & Embeddings| Gemini
+    API -->|Query & Upsert Vectors| Pinecone
+    
+    classDef frontend fill:#4285F4,stroke:#1565C0,color:#fff
+    classDef backend fill:#34A853,stroke:#0F9D58,color:#fff
+    classDef firebase fill:#FFA000,stroke:#F57C00,color:#fff
+    classDef external fill:#EA4335,stroke:#C5221F,color:#fff
+    
+    class Browser,StaticFiles frontend
+    class API,Auth,Firestore,Storage firebase
+    class Gemini,Pinecone external
 ```
 
 ## Architecture Overview
 
 ### **Client Layer**
-- **Browser**: User interface accessed via web browser
-- Supports modern browsers with JavaScript enabled
+- **Browser**: User interface accessed via web browser.
+- **Frontend**: React 18 Single Page Application (SPA) built with Vite.
+- **State Management**: TanStack Query for server state synchronization.
+- **Authentication**: Firebase Auth SDK handles login and token management.
 
-### **Frontend Layer** (Port 5173)
-- **Framework**: React 18 with Vite build tool
-- **State Management**: TanStack Query (React Query) for server state
-- **UI Library**: Material UI (MUI) for components
-- **Routing**: React Router for navigation
-- **Language**: TypeScript for type safety
-- **Authentication**: Firebase Auth SDK with automatic token refresh
+### **Backend Layer** (Cloud Run)
+- **Service**: FastAPI (Python) running in Docker containers on Google Cloud Run.
+- **Scaling**: Auto-scales from 0 to N instances based on traffic.
+- **Security**: Verifies Firebase ID tokens on every request using Firebase Admin SDK.
+- **Responsibilities**:
+  - AI Orchestration (RAG, Translation, Flashcards)
+  - Vector Database Management (Pinecone)
+  - Complex Business Logic
+  - PDF Processing
 
-### **Backend Layer** (Port 8787)
-- **Framework**: FastAPI (Python)
-- **Authentication**: Firebase ID token verification middleware
-- **Architecture**: Service-oriented design with separation of concerns
+### **Data Layer**
+- **Firestore (NoSQL)**: Single source of truth for application state.
+  - `notes`: Bilingual markdown content.
+  - `documents`: Metadata for uploaded files.
+  - `flashcards`: Generated study materials.
+  - `profiles`: User settings (e.g., preferred LLM model).
+- **Cloud Storage**: Stores binary assets (PDFs, images).
+- **Pinecone (Vector DB)**: Stores 768-dimensional text embeddings for semantic search.
 
-#### API Endpoints
-| Route | Purpose |
-|-------|---------|
-| `POST /api/notes/ai-qa` | RAG-based Q&A over notes |
-| `POST /api/notes/reindex` | Rebuild vector embeddings |
-| `POST /api/documents/upload-process` | Process PDF documents |
-| `POST /api/flashcards/*` | Flashcard generation & review |
+### **AI Layer**
+- **Google Gemini**:
+  - **LLM**: `gemini-2.0-flash-lite` for text generation, translation, and reasoning.
+  - **Embeddings**: `text-embedding-004` for converting text to vectors.
 
-#### Services Layer
-- **LLM Service**: Handles Google Gemini API calls for chat and embeddings
-- **Vector Service**: Manages Pinecone vector database operations
-- **RAG Service**: Implements retrieval-augmented generation pipeline
-- **PDF Service**: Parses PDF documents and extracts text
-- **Note Service**: CRUD operations for notes
-- **Document Service**: Document processing and storage
+---
 
-### **Google Cloud Platform**
-#### Firebase Services
-- **Authentication**: OAuth 2.0, Google Sign-In, Email/Password
-- **Firestore**: NoSQL database for structured data
-  - Collections: `notes`, `documents`, `flashcards`, `folders`
-- **Cloud Storage**: Binary file storage
-  - Buckets: `documents/{uid}/*.pdf`, `note-assets/{uid}/*`
+## Key Data Flows
 
-#### Google AI
-- **Gemini API**:
-  - Model: User selectable (default: `gemini-2.0-flash-lite`)
-  - Embeddings: `text-embedding-004` (768 dimensions)
-
-### **External Services**
-#### Pinecone Vector Database
-- **Index**: `learningaier-chunks`
-- **Dimensions**: 768 (matching Gemini embeddings)
-- **Metric**: Cosine similarity
-- **Purpose**: Semantic search for RAG pipeline
-
-## Data Flow
-
-### 1. **User Authentication**
+### 1. User Authentication
 ```
-User → Frontend → Firebase Auth → Backend (Token Verification)
+User → Frontend (Firebase Auth SDK) → Firebase Auth Server
+  → Returns ID Token
+  → Frontend stores token (auto-refreshed)
+  → All API calls include "Authorization: Bearer <token>"
+  → Backend middleware verifies token via Firebase Admin SDK
+  → Extracts user.uid for authorization
 ```
 
-### 2. **Note Creation & Indexing**
+### 2. Note Creation & Indexing
 ```
-User creates note → Frontend API → Backend → Firestore (save note)
-                                          → LLM Service (generate embeddings)
-                                          → Pinecone (store vectors)
-```
+User creates note
+  → Frontend → Firestore (direct write via SDK)
+  → Note saved with content_md_zh, content_md_en
 
-### 3. **RAG Question Answering**
-```
-User asks question → Frontend → RAG Service → Pinecone (find similar chunks)
-                                           → LLM Service (generate answer)
-                                           → Frontend (display answer)
-```
-
-### 4. **PDF Document Processing**
-```
-User uploads PDF → Frontend → Cloud Storage (store file)
-                           → Backend → PDF Service (parse text)
-                                    → LLM Service (chunk & embed)
-                                    → Pinecone (index chunks)
-                                    → Firestore (save metadata)
+User clicks "Reindex"
+  → Frontend → POST /api/notes/reindex
+  → Backend:
+    1. Fetch note from Firestore
+    2. Combine zh + en content
+    3. Chunk text (500 chars, 25% overlap)
+    4. Generate embeddings via Gemini (text-embedding-004)
+    5. Delete old vectors from Pinecone
+    6. Upsert new vectors with metadata
+  → Frontend: Success notification
 ```
 
-## Technology Stack
+### 3. RAG Question Answering
+```
+User asks: "What are the key concepts?"
+  → Frontend → POST /api/notes/ai-qa { question, note_id, top_k }
+  → Backend (RAG Service):
+    1. Generate query embedding via Gemini
+    2. Query Pinecone with filters: { user_id, note_id } → Get top-5 chunks
+    3. Construct prompt: "Context: [chunks]\\nQuestion: ...\\nAnswer:"
+    4. Call Gemini LLM (gemini-2.0-flash-lite)
+    5. Return answer + source chunks
+  → Frontend: Display answer with source references
+```
 
-### Frontend
-- **React** 18.2 - UI framework
-- **Vite** 5.2 - Build tool & dev server
-- **TypeScript** 5.2 - Type safety
-- **Material UI** 7.3 - Component library
-- **TanStack Query** 5.90 - Data fetching & caching
-- **React Router** 7.9 - Client-side routing
-- **Firebase SDK** 12.6 - Authentication & Firestore client
+### 4. PDF Document Processing
+```
+User uploads PDF
+  → Frontend → Cloud Storage (direct upload via Firebase SDK)
+  → Frontend → POST /api/documents/upload-process { document_id, file_path }
+  → Backend (Document Service):
+    1. Download PDF from Cloud Storage to temp file
+    2. Extract text via PyPDF2
+    3. Create draft note in Firestore
+    4. Chunk text
+    5. Generate embeddings via Gemini
+    6. Upsert vectors to Pinecone
+  → Frontend: Success, navigate to new note
+```
 
-### Backend
-- **FastAPI** 0.115 - Web framework
-- **Python** 3.9+ - Runtime
-- **Pydantic** - Request/response validation
-- **Firebase Admin SDK** - Server-side Firebase integration
-- **PyPDF2** - PDF text extraction
-- **Google Generative AI** - LLM operations
-
-### Infrastructure
-- **Firebase**:
-  - Authentication
-  - Firestore (NoSQL database)
-  - Cloud Storage (file storage)
-- **Google Gemini**: LLM & embeddings
-- **Pinecone**: Vector similarity search
-- **GitHub**: Version control
-- **Docker**: Containerization (optional)
+---
 
 ## Deployment Architecture
 
-### Current (Development)
-- **Frontend**: Local dev server (Vite) on port 5173
-- **Backend**: Local uvicorn server on port 8787
-- **Database**: Firebase Production (learningaier project)
-
-### Proposed (Production)
-```mermaid
-flowchart LR
-    Users["👥 Users"]
-    
-    subgraph Hosting["Firebase Hosting"]
-        StaticSite["Static React App<br/>(CDN Distributed)"]
-    end
-    
-    subgraph CloudRun["Google Cloud Run"]
-        API["FastAPI Backend<br/>(Auto-scaling)"]
-    end
-    
-    subgraph Firebase["Firebase"]
-        Auth["Authentication"]
-        DB["Firestore"]
-        Storage["Cloud Storage"]
-    end
-    
-    Gemini["Google Gemini API"]
-    Pinecone["Pinecone Vector DB"]
-    
-    Users --> StaticSite
-    StaticSite -->|HTTPS API Calls| API
-    API --> Auth
-    API --> DB
-    API --> Storage
-    API --> Gemini
-    API --> Pinecone
-    
-    classDef hosting fill:#FFA000,stroke:#F57C00
-    classDef compute fill:#4285F4,stroke:#1565C0
-    classDef data fill:#34A853,stroke:#0F9D58
-    
-    class StaticSite hosting
-    class API compute
-    class Auth,DB,Storage,Gemini,Pinecone data
-```
-
-## Security
-
-### Authentication Flow
-1. User signs in via Firebase Auth (frontend)
-2. Frontend receives Firebase ID token
-3. Token automatically included in API requests (Bearer header)
-4. Backend verifies token with Firebase Admin SDK
-5. User ID extracted from token for authorization
-
-### API Security
-- ✅ All endpoints require authentication
-- ✅ Firebase ID token verification on every request
-- ✅ User-scoped data access (uid-based filtering)
-- ✅ CORS configuration for frontend domain
-- ✅ Environment variables for API keys
-
-## Performance Optimizations
-
 ### Frontend
-- Code splitting with React Router
-- TanStack Query caching & background refetch
-- Lazy loading of components
-- Optimistic UI updates
+- **Platform**: Firebase Hosting
+- **Build**: `npm run build` (Vite) produces static assets in `dist/`
+- **CDN**: Assets distributed globally via Google's CDN
+- **CI/CD**: GitHub Actions triggers on push to `main`
 
 ### Backend
-- Async/await for all I/O operations
-- Connection pooling for Firestore & Pinecone
-- Batch operations for embeddings
-- FastAPI automatic documentation & validation
+- **Platform**: Google Cloud Run
+- **Container**: Docker image based on `python:3.11-slim`
+- **Registry**: Google Container Registry (GCR)
+- **CI/CD**: GitHub Actions builds image, pushes to GCR, and deploys to Cloud Run
+- **Configuration**: Environment variables managed via Cloud Run revision settings (secrets mapped from GitHub Secrets)
 
-## Monitoring & Observability
+## Security Model
 
-### Current
-- Browser console for frontend debugging
-- FastAPI auto-generated docs at `/docs`
-- Environment configuration logging
-
-### Recommended
-- Firebase Analytics for user behavior
-- Cloud Logging for backend errors
-- Sentry for error tracking
-- Pinecone metrics dashboard
-
-## Future Enhancements
-
-- [ ] Redis caching layer for frequent queries
-- [ ] WebSocket support for real-time collaboration
-- [ ] Background job queue (Celery) for long-running tasks
-- [ ] Multi-tenant support with workspace isolation
-- [ ] Advanced analytics dashboard
-- [ ] Mobile app (React Native)
+1. **Transport**: All traffic over HTTPS.
+2. **Authentication**: Firebase Auth (OAuth/Email).
+3. **Authorization**:
+   - Frontend: Firestore Security Rules (row-level security).
+   - Backend: ID Token verification + UID checks in business logic.
+4. **Secrets**:
+   - Frontend: Only public config (API keys are restricted by domain).
+   - Backend: Service account credentials and API keys injected as environment variables.
