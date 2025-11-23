@@ -97,20 +97,34 @@ Edit `.env.local` with your credentials:
 
 **Development mode (with hot reload):**
 ```bash
+uvicorn app.main:app --reload --port 8080
+```
+
+**Using a different port for local development:**
+```bash
+# Option 1: Set PORT in .env.local
+PORT=8787
+
+# Option 2: Use --port flag
 uvicorn app.main:app --reload --port 8787
 ```
 
 **Production mode:**
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8787 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 4
 ```
 
 The API will be available at:
-- API: http://localhost:8787
-- Interactive docs: http://localhost:8787/docs
-- Alternative docs: http://localhost:8787/redoc
+- API: http://localhost:8080
+- Interactive docs: http://localhost:8080/docs
+- Alternative docs: http://localhost:8080/redoc
 
 ## API Endpoints
+
+### Health & Root
+
+- `GET /` - API info and version
+- `GET /health` - Health check endpoint (used by Cloud Run)
 
 ### Notes
 
@@ -135,7 +149,7 @@ All endpoints require Firebase ID token in `Authorization: Bearer <token>` heade
 ### Question Answering
 
 ```bash
-curl -X POST http://localhost:8787/api/notes/ai-qa \
+curl -X POST http://localhost:8080/api/notes/ai-qa \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -148,7 +162,7 @@ curl -X POST http://localhost:8787/api/notes/ai-qa \
 ### Document Processing
 
 ```bash
-curl -X POST http://localhost:8787/api/documents/upload-process \
+curl -X POST http://localhost:8080/api/documents/upload-process \
   -H "Authorization: Bearer YOUR_FIREBASE_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -211,18 +225,28 @@ PYTHONPATH=. pytest -v
 
 ### Docker (Recommended)
 
-### Docker (Recommended)
-
 1. **Build the image:**
    ```bash
+   cd backend-fastapi
    docker build -t learningaier-backend .
    ```
 
-2. **Run locally (passing environment variables):**
+2. **Run locally with default port (8080):**
    ```bash
    docker run -p 8080:8080 --env-file .env.local learningaier-backend
    ```
-   *Note: Ensure your `.env.local` file exists and contains all required credentials.*
+   Access the API at: http://localhost:8080
+
+3. **Run with custom port (e.g., 8787):**
+   ```bash
+   # Update .env.local: PORT=8787
+   docker run -p 8787:8787 --env-file .env.local learningaier-backend
+   ```
+   Access the API at: http://localhost:8787
+
+   > **How it works**: The Dockerfile reads the `PORT` environment variable from your `.env.local` file. The `-p` flag maps your host port (left) to the container port (right). They should match the PORT in `.env.local`.
+
+**Note**: Ensure your `.env.local` file exists with all required credentials. See `.env.local.template` for reference.
 
 ### Google Cloud Run Deployment Guide
 
@@ -454,7 +478,9 @@ This FastAPI backend replaces the Node.js/Express backend. Key differences:
 
 **Import errors**: Ensure virtual environment is activated and dependencies installed
 
-**Port already in use**: Change port in `.env.local` or use `--port` flag
+**Port already in use**: Change `PORT` in `.env.local` or use `--port` flag with uvicorn
+
+**Container fails to start on Cloud Run**: Ensure the app listens on the `PORT` environment variable (not hardcoded). The Dockerfile has been configured to handle this automatically.
 
 ## License
 
