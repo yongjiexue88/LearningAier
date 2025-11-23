@@ -1,6 +1,6 @@
 """Pydantic models for flashcard-related requests and responses"""
 from pydantic import BaseModel, Field
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 
 class GenerateFlashcardsRequest(BaseModel):
@@ -11,8 +11,9 @@ class GenerateFlashcardsRequest(BaseModel):
 
 class FlashcardItem(BaseModel):
     """Single flashcard item"""
-    front: str
-    back: str
+    term: str
+    definition: str
+    context: Optional[str] = None
 
 
 class GenerateFlashcardsResponse(BaseModel):

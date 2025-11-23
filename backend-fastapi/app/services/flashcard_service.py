@@ -37,22 +37,33 @@ class FlashcardService:
         batch = self.db.batch()
         flashcards_collection = self.db.collection("flashcards")
         
+        print(f"[DEBUG] LLM Output: {cards_data}")  # Debug logging
+
         created_cards = []
         for card in cards_data:
-            new_card_ref = flashcards_collection.document()
-            card_doc = {
-                "user_id": user_id,
-                "note_id": note_id,
-                "front": card["front"],
-                "back": card["back"],
-                "status": "new",
-                "interval": 0,
-                "ease_factor": 2.5,
-                "next_review": datetime.now(timezone.utc),
-                "created_at": datetime.now(timezone.utc)
-            }
-            batch.set(new_card_ref, card_doc)
-            created_cards.append(card)
+            try:
+                new_card_ref = flashcards_collection.document()
+                card_doc = {
+                    "user_id": user_id,
+                    "note_id": note_id,
+                    "term": card["term"],
+                    "definition": card["definition"],
+                    "context": card.get("context"),
+                    "status": "new",
+                    "interval": 0,
+                    "ease_factor": 2.5,
+                    "next_review": datetime.now(timezone.utc),
+                    "created_at": datetime.now(timezone.utc),
+                    "category": "vocabulary"
+                }
+                batch.set(new_card_ref, card_doc)
+                created_cards.append(card)
+            except KeyError as e:
+                print(f"[ERROR] Missing key in flashcard data: {e}, Data: {card}")
+                continue
+            except Exception as e:
+                print(f"[ERROR] Failed to process flashcard: {e}, Data: {card}")
+                continue
             
         batch.commit()
         

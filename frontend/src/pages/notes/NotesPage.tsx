@@ -1027,10 +1027,10 @@ export function NotesPage() {
           set_id: null,
           note_id: selectedNoteId,
           document_id: null,
-          term: null,
-          definition: card.back || "",
-          context: null,
-          category: "definition",
+          term: card.term ?? null,
+          definition: card.definition ?? "",
+          context: card.context ?? null,
+          category: card.category ?? "vocabulary",
         })) ?? [];
       if (!generated.length) {
         showSnackbar("No flashcards generated. Try adjusting the note content.", "info");

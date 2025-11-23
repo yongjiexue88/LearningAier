@@ -174,7 +174,7 @@ class LLMService:
         
         Output JSON format:
         [
-            {{"front": "Question or concept", "back": "Answer or explanation"}}
+            {{"term": "Concept or term", "definition": "Clear definition", "context": "Optional context or usage example"}}
         ]
         """
         
@@ -185,10 +185,11 @@ class LLMService:
             "items": {
                 "type": "object",
                 "properties": {
-                    "front": {"type": "string"},
-                    "back": {"type": "string"}
+                    "term": {"type": "string"},
+                    "definition": {"type": "string"},
+                    "context": {"type": "string"}
                 },
-                "required": ["front", "back"]
+                "required": ["term", "definition"]
             }
         }
         

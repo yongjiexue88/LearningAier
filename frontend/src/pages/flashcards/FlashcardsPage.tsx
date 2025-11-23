@@ -598,7 +598,7 @@ export function FlashcardsPage() {
                   </Typography>
                 ) : null}
                 <Typography variant="subtitle2" color="text.secondary">
-                  {activeCard.category.toUpperCase()}
+                  {(activeCard.category?.toUpperCase() ?? "VOCABULARY")}
                   {activeCard.note_id && notesById.get(activeCard.note_id)
                     ? ` • ${notesById.get(activeCard.note_id)?.title ?? ""}`
                     : ""}

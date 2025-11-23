@@ -78,8 +78,9 @@ export interface GenerateFlashcardsRequest {
 }
 
 export interface FlashcardItem {
-    front: string;
-    back: string;
+    term: string;
+    definition: string;
+    context?: string;
     tags?: string[];
 }
 
