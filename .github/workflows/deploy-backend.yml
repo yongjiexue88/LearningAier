@@ -34,7 +34,14 @@ jobs:
       - name: Build and Push Container
         run: |
           cd backend-fastapi
-          gcloud builds submit --tag gcr.io/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}
+          gcloud builds submit --tag gcr.io/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }} --async
+          
+      - name: Wait for Build
+        run: |
+          # Get the latest build ID
+          BUILD_ID=$(gcloud builds list --limit=1 --format="value(id)")
+          echo "Waiting for build $BUILD_ID to complete..."
+          gcloud builds wait $BUILD_ID
 
       - name: Deploy to Cloud Run
         run: |

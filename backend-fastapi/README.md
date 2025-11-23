@@ -348,6 +348,95 @@ You can manage your service (view logs, update variables, rollback) via the Goog
     *   **Cause**: Application failed to start (crashed).
     *   **Fix**: Check Cloud Run logs. Common reasons: missing env vars, invalid API keys, or code errors.
 
+## Automated Deployment (GitHub Actions)
+
+You can set up automated deployment to Cloud Run whenever you push to the `main` branch.
+
+### 1. GitHub Workflow File
+
+The workflow is already configured in `.github/workflows/deploy-backend.yml`. It triggers on:
+- Push to `main` branch
+- Changes to `backend-fastapi/**` files
+
+### 2. Required GitHub Secrets
+
+Add these secrets to your GitHub repository (Settings > Secrets and variables > Actions):
+
+| Secret Name | Description | How to Get It |
+|-------------|-------------|---------------|
+| `GCP_SA_KEY` | Google Cloud service account JSON key | See instructions below |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin SDK credentials | Copy entire content of your Firebase service account JSON file |
+| `LLM_API_KEY` | Google Gemini API key | From your `backend-fastapi/.env.local` |
+| `PINECONE_API_KEY` | Pinecone API key | From your `backend-fastapi/.env.local` |
+| `PINECONE_INDEX_HOST` | Pinecone index URL | From your `backend-fastapi/.env.local` |
+
+### 3. Creating GCP Service Account for Deployment
+
+The `GCP_SA_KEY` needs special permissions to deploy your app. Here's how to create it:
+
+#### Step 1: Create Service Account
+1. Go to [GCP Console > IAM & Admin > Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts)
+2. Click **"Create Service Account"**
+3. Name: `github-actions-deploy` (or any name you prefer)
+4. Click **"Create and Continue"**
+
+#### Step 2: Grant Required Roles
+Add these 3 roles to the service account:
+
+| Role | Why It's Needed | How to Find It |
+|------|----------------|----------------|
+| **Cloud Run Admin** | Deploy and update Cloud Run services | Search "cloud run" → Select "Cloud Run Admin" |
+| **Cloud Build Service Account** | Build Docker images in the cloud | Search "cloud build" → Select "Cloud Build Service Account" |
+| **Storage Admin** | Upload build artifacts during deployment | Search "storage admin" → Select "Storage Admin" |
+
+**How roles work**: The service account is like a robot user for GitHub Actions. The JSON key is its password, and roles determine what it can do. Without these roles, the key would be valid but powerless.
+
+Click **"Add another role"** to add all 3 roles to the same service account.
+
+#### Step 3: Generate JSON Key
+1. Click **"Done"** to create the service account
+2. Find it in the list and **click on the email** to open details
+3. Go to the **"KEYS"** tab
+4. Click **"ADD KEY" → "Create new key"**
+5. Select **"JSON"** format
+6. Click **"CREATE"**
+7. The JSON file will download automatically
+
+#### Step 4: Add to GitHub Secrets
+1. Open the downloaded JSON file in a text editor
+2. Copy the **entire contents**
+3. Go to GitHub → Settings → Secrets → **"New repository secret"**
+4. Name: `GCP_SA_KEY`
+5. Value: Paste the JSON content
+6. Click **"Add secret"**
+
+**Security**: Delete or secure the downloaded JSON file after adding it to GitHub. Never commit it to Git!
+
+### 4. Testing the Workflow
+
+After adding all secrets, test the deployment:
+
+```bash
+# Make a small change to trigger deployment
+cd backend-fastapi
+echo "# Auto-deploy enabled" >> README.md
+git add .
+git commit -m "test: trigger auto-deployment"
+git push origin main
+```
+
+Watch the deployment progress:
+1. Go to your GitHub repo → **Actions** tab
+2. You'll see the workflow running
+3. Click on it to see live logs
+4. Once complete, visit your Cloud Run URL to verify
+
+### 5. Managing Deployments
+
+- **View Services**: [Cloud Run Console](https://console.cloud.google.com/run)
+- **Check Logs**: Click on your service → **LOGS** tab
+- **Rollback**: Click on service → **REVISIONS** → Select previous revision → **Manage traffic**
+
 ## Migration from Node.js Backend
 
 This FastAPI backend replaces the Node.js/Express backend. Key differences:
