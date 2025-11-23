@@ -15,7 +15,9 @@ app = FastAPI(
 
 @app.on_event("startup")
 async def startup_event():
-    """Log startup information"""
+    """Log startup information and initialize Firebase"""
+    from app.core.firebase import get_firebase_app
+    
     settings = get_settings()
     print("="*80)
     print("🚀 LearningAier API Starting Up")
@@ -26,6 +28,15 @@ async def startup_event():
     print(f"🤖 LLM Provider: {settings.llm_provider}")
     print(f"🤖 LLM Model: {settings.llm_model}")
     print(f"📊 Vector DB: {settings.vector_db_provider}")
+    
+    # Initialize Firebase Admin SDK
+    try:
+        get_firebase_app()
+        print("✅ Firebase Admin SDK initialized successfully")
+    except Exception as e:
+        print(f"❌ Firebase initialization failed: {e}")
+        raise
+    
     print("="*80)
 
 

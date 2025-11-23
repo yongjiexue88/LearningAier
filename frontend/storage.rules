@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for LearningAier
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Documents folder (PDFs)
+    // Path: documents/{userId}/{documentId}/{filename}
+    match /documents/{userId}/{documentId}/{filename} {
+      // Allow authenticated users to upload to their own folder
+      allow write: if isAuthenticated() && isOwner(userId);
+      
+      // Allow authenticated users to read their own documents
+      allow read: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Note assets folder (images, etc.)
+    // Path: note-assets/{userId}/{filename}
+    match /note-assets/{userId}/{filename} {
+      // Allow authenticated users to upload to their own folder
+      allow write: if isAuthenticated() && isOwner(userId);
+      
+      // Allow authenticated users to read their own assets
+      allow read: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // Deny all other access by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

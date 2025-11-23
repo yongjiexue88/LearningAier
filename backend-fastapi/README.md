@@ -102,11 +102,11 @@ uvicorn app.main:app --reload --port 8080
 
 **Using a different port for local development:**
 ```bash
-# Option 1: Set PORT in .env.local
-PORT=8787
+# Option 1: Using environment variable (reads PORT from .env.local)
+uvicorn app.main:app --reload
 
-# Option 2: Use --port flag
-uvicorn app.main:app --reload --port 8787
+# Option 2: Explicitly specify port
+uvicorn app.main:app --reload --port 8080
 ```
 
 **Production mode:**
@@ -237,12 +237,12 @@ PYTHONPATH=. pytest -v
    ```
    Access the API at: http://localhost:8080
 
-3. **Run with custom port (e.g., 8787):**
+3. **Run with custom port (e.g., 8081):**
    ```bash
-   # Update .env.local: PORT=8787
-   docker run -p 8787:8787 --env-file .env.local learningaier-backend
+   # Update .env.local: PORT=8081
+   docker run -p 8081:8081 --env-file .env.local learningaier-backend
    ```
-   Access the API at: http://localhost:8787
+   Access the API at: http://localhost:8081
 
    > **How it works**: The Dockerfile reads the `PORT` environment variable from your `.env.local` file. The `-p` flag maps your host port (left) to the container port (right). They should match the PORT in `.env.local`.
 
