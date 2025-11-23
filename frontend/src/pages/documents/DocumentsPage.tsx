@@ -1,8 +1,14 @@
 import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DescriptionIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewIcon from "@mui/icons-material/OpenInNewRounded";
 import {
   Box,
   Button,
+  Card,
+  CardContent,
+  CardActions,
   Paper,
   Stack,
   TextField,
@@ -10,16 +16,34 @@ import {
   CircularProgress,
   Alert,
   LinearProgress,
+  IconButton,
+  Chip,
 } from "@mui/material";
 import { useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../../providers/AuthProvider";
 import { firebaseAuth, firebaseStorage, firebaseDb } from "../../lib/firebaseClient";
 import { ref, uploadBytesResumable } from "firebase/storage";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
 
+interface DocumentRecord {
+  id: string;
+  user_id: string;
+  title: string;
+  file_name: string;
+  file_size: number;
+  status: string;
+  note_id?: string;
+  created_at: any;
+  updated_at: any;
+}
+
 export function DocumentsPage() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -29,6 +53,53 @@ export function DocumentsPage() {
   const [noteId, setNoteId] = useState<string | null>(null);
 
   const processDocumentMutation = useProcessDocument();
+
+  const documentsQuery = useQuery({
+    enabled: Boolean(user?.uid),
+    queryKey: ["documents", user?.uid],
+    queryFn: async (): Promise<DocumentRecord[]> => {
+      if (!user?.uid) return [];
+
+      const baseQuery = query(
+        collection(firebaseDb, "documents"),
+        where("user_id", "==", user.uid)
+      );
+
+      try {
+        // Try with orderBy first
+        const qWithOrder = query(baseQuery, orderBy("created_at", "desc"));
+        const snapshot = await getDocs(qWithOrder);
+        console.log("[DocumentsPage] Fetched documents:", snapshot.docs.length);
+        return snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        })) as DocumentRecord[];
+      } catch (error: any) {
+        // Fallback without orderBy if index is missing
+        if (error?.code === "failed-precondition") {
+          console.warn("[DocumentsPage] Missing index, falling back to client-side sort");
+          const snapshot = await getDocs(baseQuery);
+          const docs = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as DocumentRecord[];
+
+          // Sort on client side
+          return docs.sort((a, b) => {
+            const aTime = a.created_at?.toMillis?.() ?? 0;
+            const bTime = b.created_at?.toMillis?.() ?? 0;
+            return bTime - aTime;
+          });
+        }
+        console.error("[DocumentsPage] Error fetching documents:", error);
+        throw error;
+      }
+    },
+  });
+
+  const documents = documentsQuery.data ?? [];
+
+  console.log("[DocumentsPage] Documents:", documents, "Loading:", documentsQuery.isLoading, "Error:", documentsQuery.error);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -144,6 +215,34 @@ export function DocumentsPage() {
     setDocumentId(null);
     setNoteId(null);
     setUploadProgress(0);
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!confirm("Delete this document? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      await deleteDoc(doc(firebaseDb, "documents", documentId));
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      setErrorMessage("");
+    } catch (error) {
+      console.error("Delete error:", error);
+      setErrorMessage(`Failed to delete document: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+  };
+
+  const formatDate = (timestamp: any): string => {
+    if (!timestamp) return "N/A";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString();
   };
 
   return (
@@ -309,6 +408,112 @@ export function DocumentsPage() {
           </Box>
         </Box>
       )}
-    </Stack>
+
+      {/* Document List Section */}
+      <Box>
+        <Typography variant="h5" fontWeight={700} mb={2}>
+          Your Documents
+        </Typography>
+        {documentsQuery.isLoading ? (
+          <Stack alignItems="center" justifyContent="center" sx={{ py: 6 }}>
+            <CircularProgress size={32} />
+            <Typography variant="body2" color="text.secondary" mt={2}>
+              Loading documents...
+            </Typography>
+          </Stack>
+        ) : documents.length === 0 ? (
+          <Paper sx={{ p: 4, textAlign: "center" }}>
+            <DescriptionIcon sx={{ fontSize: 48, color: "text.secondary", mb: 2 }} />
+            <Typography variant="h6" color="text.secondary">
+              No documents yet
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Upload your first PDF to get started
+            </Typography>
+          </Paper>
+        ) : (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                md: "repeat(3, 1fr)",
+              },
+              gap: 3,
+            }}
+          >
+            {documents.map((document) => (
+              <Card
+                key={document.id}
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "transform 0.2s, box-shadow 0.2s",
+                  "&:hover": {
+                    transform: "translateY(-4px)",
+                    boxShadow: 4,
+                  },
+                }}
+              >
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                    <DescriptionIcon color="primary" />
+                    <Typography variant="h6" component="div" noWrap>
+                      {document.title}
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    <Typography variant="body2" color="text.secondary">
+                      📅 {formatDate(document.created_at)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      📁 {formatFileSize(document.file_size)}
+                    </Typography>
+                    <Box mt={1}>
+                      <Chip
+                        label={document.status || "unknown"}
+                        size="small"
+                        color={
+                          document.status === "completed"
+                            ? "success"
+                            : document.status === "processing"
+                              ? "warning"
+                              : "default"
+                        }
+                      />
+                    </Box>
+                  </Stack>
+                </CardContent>
+                <CardActions sx={{ justifyContent: "space-between", px: 2, pb: 2 }}>
+                  {document.note_id ? (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      href={`/notes`}
+                      startIcon={<OpenInNewIcon />}
+                    >
+                      View Note
+                    </Button>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      No note yet
+                    </Typography>
+                  )}
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleDeleteDocument(document.id)}
+                  >
+                    <DeleteIcon />
+                  </IconButton>
+                </CardActions>
+              </Card>
+            ))}
+          </Box>
+        )}
+      </Box>
+    </Stack >
   );
 }
