@@ -174,7 +174,7 @@ class LLMService:
         
         Output JSON format:
         [
-            {"front": "Question or concept", "back": "Answer or explanation"}
+            {{"front": "Question or concept", "back": "Answer or explanation"}}
         ]
         """
         
