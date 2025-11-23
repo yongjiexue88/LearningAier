@@ -1,6 +1,5 @@
 import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ErrorIcon from "@mui/icons-material/Error";
 import {
   Box,
   Button,
@@ -26,7 +25,6 @@ export function DocumentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [summaryZh, setSummaryZh] = useState("");
-  const [summaryEn, setSummaryEn] = useState("");
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [noteId, setNoteId] = useState<string | null>(null);
 
@@ -107,10 +105,7 @@ export function DocumentsPage() {
           setUploadStatus("error");
         },
         async () => {
-          // 3. Upload complete, get download URL
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-
-          // 4. Call backend to process the document
+          // 3. Upload complete, now call backend to process the document
           setUploadStatus("processing");
 
           processDocumentMutation.mutate(
