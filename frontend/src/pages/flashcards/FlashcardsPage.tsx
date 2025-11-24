@@ -527,7 +527,7 @@ export function FlashcardsPage() {
     setSelectedIds(newSelecteds);
   };
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -926,9 +926,6 @@ export function FlashcardsPage() {
             </TableHead>
             <TableBody>
               {paginatedFlashcards.map((card) => {
-                const noteTitle = card.note_id
-                  ? notesById.get(card.note_id)?.title ?? "Note removed"
-                  : "Manual";
                 const dueLabel = card.next_due_at
                   ? dayjs(card.next_due_at).fromNow()
                   : "Due now";
