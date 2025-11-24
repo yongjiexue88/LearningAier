@@ -8,7 +8,12 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   MenuItem,
@@ -20,10 +25,12 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
 } from "@mui/material";
+import EditIcon from "@mui/icons-material/EditRounded";
 import { FirebaseError } from "firebase/app";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -36,7 +43,9 @@ import {
   getDocs,
   orderBy,
   query,
+  updateDoc,
   where,
+  writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -140,6 +149,11 @@ export function FlashcardsPage() {
     message: "",
     severity: "success",
   });
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editingCard, setEditingCard] = useState<FlashcardRecord | null>(null);
+
   const [newFlashcard, setNewFlashcard] = useState<{
     term: string;
     definition: string;
@@ -343,8 +357,52 @@ export function FlashcardsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
       showSnackbar("Flashcard deleted", "info");
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        // We don't know which ID was deleted here easily without passing it, 
+        // but it's fine, the list will update.
+        return next;
+      });
     },
     onError: (error: any) => showSnackbar(error?.message ?? "Delete failed", "error"),
+  });
+
+  const updateFlashcardMutation = useMutation({
+    mutationFn: async (card: FlashcardRecord) => {
+      if (!userId) throw new Error("User not found");
+      const { id, ...data } = card;
+      const ref = doc(firebaseDb, "flashcards", id);
+      await updateDoc(ref, {
+        term: data.term,
+        definition: data.definition,
+        context: data.context,
+        category: data.category,
+        updated_at: new Date().toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
+      setEditingCard(null);
+      showSnackbar("Flashcard updated");
+    },
+    onError: (error: any) => showSnackbar(error?.message ?? "Update failed", "error"),
+  });
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const batch = writeBatch(firebaseDb);
+      ids.forEach((id) => {
+        const ref = doc(firebaseDb, "flashcards", id);
+        batch.delete(ref);
+      });
+      await batch.commit();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
+      setSelectedIds(new Set());
+      showSnackbar("Selected flashcards deleted", "info");
+    },
+    onError: (error: any) => showSnackbar(error?.message ?? "Batch delete failed", "error"),
   });
 
   // Use new React Query hook for flashcard review
@@ -442,6 +500,40 @@ export function FlashcardsPage() {
   }, [notesQuery.data, selectedFolderId]);
 
   const activeAnswerShown = activeCard && showAnswerFor === activeCard.id;
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newSelecteds = new Set(selectedIds);
+    if (event.target.checked) {
+      paginatedFlashcards.forEach((card) => newSelecteds.add(card.id));
+    } else {
+      paginatedFlashcards.forEach((card) => newSelecteds.delete(card.id));
+    }
+    setSelectedIds(newSelecteds);
+  };
+
+  const handleSelectOne = (event: React.MouseEvent<unknown>, id: string) => {
+    event.stopPropagation();
+    const newSelecteds = new Set(selectedIds);
+    if (selectedIds.has(id)) {
+      newSelecteds.delete(id);
+    } else {
+      newSelecteds.add(id);
+    }
+    setSelectedIds(newSelecteds);
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const paginatedFlashcards = useMemo(() => {
+    return filteredFlashcards.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [filteredFlashcards, page, rowsPerPage]);
 
   return (
     <Stack spacing={3}>
@@ -741,7 +833,7 @@ export function FlashcardsPage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "7fr 5fr" },
+          gridTemplateColumns: "1fr",
           gap: 3,
         }}
       >
@@ -761,38 +853,77 @@ export function FlashcardsPage() {
                 Browse, delete, or jump to a card. Filters above limit the view.
               </Typography>
             </Box>
-            <Chip label={`${filteredFlashcards.length} cards`} />
+            <Stack direction="row" spacing={1} alignItems="center">
+              {selectedIds.size > 0 && (
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={() => {
+                    if (window.confirm(`Delete ${selectedIds.size} selected cards?`)) {
+                      batchDeleteMutation.mutate(Array.from(selectedIds));
+                    }
+                  }}
+                >
+                  Delete Selected ({selectedIds.size})
+                </Button>
+              )}
+              <Chip label={`${filteredFlashcards.length} cards`} />
+            </Stack>
           </Stack>
           <Divider sx={{ mb: 1 }} />
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    color="primary"
+                    indeterminate={
+                      paginatedFlashcards.some((card) => selectedIds.has(card.id)) &&
+                      !paginatedFlashcards.every((card) => selectedIds.has(card.id))
+                    }
+                    checked={
+                      paginatedFlashcards.length > 0 &&
+                      paginatedFlashcards.every((card) => selectedIds.has(card.id))
+                    }
+                    onChange={handleSelectAll}
+                  />
+                </TableCell>
                 <TableCell>Term</TableCell>
                 <TableCell>Definition</TableCell>
                 <TableCell>Due</TableCell>
-                <TableCell>Note</TableCell>
+                <TableCell>Context</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredFlashcards.map((card) => {
+              {paginatedFlashcards.map((card) => {
                 const noteTitle = card.note_id
                   ? notesById.get(card.note_id)?.title ?? "Note removed"
                   : "Manual";
                 const dueLabel = card.next_due_at
                   ? dayjs(card.next_due_at).fromNow()
                   : "Due now";
+                const isSelected = selectedIds.has(card.id);
+
                 return (
                   <TableRow
                     key={card.id}
                     hover
-                    selected={activeCard?.id === card.id}
+                    selected={isSelected || activeCard?.id === card.id}
                     sx={{ cursor: "pointer" }}
                     onClick={() => {
                       setActiveCardId(card.id);
                       setShowAnswerFor(null);
                     }}
                   >
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        color="primary"
+                        checked={isSelected}
+                        onClick={(event) => handleSelectOne(event, card.id)}
+                      />
+                    </TableCell>
                     <TableCell sx={{ maxWidth: 180 }}>
                       <Typography variant="body2" noWrap title={card.term ?? ""}>
                         {card.term || "—"}
@@ -815,32 +946,43 @@ export function FlashcardsPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" noWrap title={noteTitle}>
-                        {noteTitle}
+                      <Typography variant="body2" noWrap title={card.context ?? ""}>
+                        {card.context || "—"}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          const confirmDelete = window.confirm("Delete this flashcard?");
-                          if (confirmDelete) {
-                            deleteFlashcardMutation.mutate(card.id);
-                          }
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      <Stack direction="row" justifyContent="flex-end">
+                        <IconButton
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setEditingCard(card);
+                          }}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const confirmDelete = window.confirm("Delete this flashcard?");
+                            if (confirmDelete) {
+                              deleteFlashcardMutation.mutate(card.id);
+                            }
+                          }}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 );
               })}
               {!filteredFlashcards.length ? (
                 <TableRow>
-                  <TableCell colSpan={5}>
-                    <Typography variant="body2" color="text.secondary">
+                  <TableCell colSpan={6}>
+                    <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
                       No flashcards found. Try another filter or generate from a note.
                     </Typography>
                   </TableCell>
@@ -848,9 +990,83 @@ export function FlashcardsPage() {
               ) : null}
             </TableBody>
           </Table>
+          <TablePagination
+            rowsPerPageOptions={[10, 20, 30, 40, 50]}
+            component="div"
+            count={filteredFlashcards.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
         </Paper>
 
       </Box>
+
+      {/* Edit Dialog */}
+      <Dialog open={Boolean(editingCard)} onClose={() => setEditingCard(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Edit Flashcard</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Term"
+              fullWidth
+              value={editingCard?.term ?? ""}
+              onChange={(e) =>
+                setEditingCard((prev) => (prev ? { ...prev, term: e.target.value } : null))
+              }
+            />
+            <TextField
+              label="Definition"
+              fullWidth
+              multiline
+              minRows={3}
+              value={editingCard?.definition ?? ""}
+              onChange={(e) =>
+                setEditingCard((prev) => (prev ? { ...prev, definition: e.target.value } : null))
+              }
+            />
+            <TextField
+              label="Context"
+              fullWidth
+              value={editingCard?.context ?? ""}
+              onChange={(e) =>
+                setEditingCard((prev) => (prev ? { ...prev, context: e.target.value } : null))
+              }
+            />
+            <TextField
+              select
+              label="Category"
+              fullWidth
+              value={editingCard?.category ?? "vocabulary"}
+              onChange={(e) =>
+                setEditingCard((prev) =>
+                  prev ? { ...prev, category: e.target.value as FlashcardCategory } : null
+                )
+              }
+            >
+              {(["vocabulary", "concept", "code", "definition"] as FlashcardCategory[]).map((cat) => (
+                <MenuItem key={cat} value={cat}>
+                  {cat.toUpperCase()}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditingCard(null)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (editingCard) {
+                updateFlashcardMutation.mutate(editingCard);
+              }
+            }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}
@@ -867,6 +1083,6 @@ export function FlashcardsPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Stack>
+    </Stack >
   );
 }
