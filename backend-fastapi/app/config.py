@@ -5,6 +5,8 @@ from functools import lru_cache
 
 from typing import Optional
 
+from pydantic import field_validator
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
@@ -41,6 +43,11 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env.local"
         env_file_encoding = "utf-8"
+
+    @field_validator("llm_api_key", "embeddings_api_key", "pinecone_api_key", mode="before")
+    @classmethod
+    def strip_api_keys(cls, v: str) -> str:
+        return v.strip() if v else v
 
 
 @lru_cache()
