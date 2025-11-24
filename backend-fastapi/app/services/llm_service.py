@@ -59,6 +59,24 @@ class LLMService:
                 prompt,
                 generation_config=generation_config
             )
+            
+            # Check if response was blocked
+            if not response.candidates:
+                raise ValueError("No response candidates returned from the model")
+            
+            candidate = response.candidates[0]
+            finish_reason = candidate.finish_reason
+            
+            # Handle different finish reasons
+            if finish_reason == 2:  # MAX_TOKENS
+                raise ValueError("Response exceeded maximum token limit. Try with shorter input.")
+            elif finish_reason == 3:  # SAFETY
+                raise ValueError("Response blocked by safety filters. Content may violate content policy.")
+            elif finish_reason == 4:  # RECITATION
+                raise ValueError("Response blocked due to potential copyrighted content detection.")
+            elif finish_reason not in [0, 1]:  # Not UNSPECIFIED or STOP
+                raise ValueError(f"Response generation failed with finish_reason: {finish_reason}")
+            
             return response.text
         
         raise NotImplementedError(f"Provider {self.settings.llm_provider} not implemented")

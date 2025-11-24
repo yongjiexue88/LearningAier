@@ -15,7 +15,6 @@ import DuplicateIcon from "@mui/icons-material/ContentCopyRounded";
 import CloudUploadIcon from "@mui/icons-material/CloudUploadRounded";
 import CodeIcon from "@mui/icons-material/CodeRounded";
 import PreviewIcon from "@mui/icons-material/PreviewRounded";
-import RefreshIcon from "@mui/icons-material/RefreshRounded";
 
 import CreateNewFolderIcon from "@mui/icons-material/CreateNewFolderRounded";
 import {
@@ -56,6 +55,8 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useAuth } from "../../providers/AuthProvider";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useStartConversation } from "../../hooks/useChat";
+import { sendMessage } from "../../services/api/chat";
 import { saveAs } from "file-saver";
 import {
   buildFolderTree,
@@ -87,9 +88,9 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import {
-  useAIQA,
   useReindexNote,
   useTranslateNote,
+  useExtractGraph,
 } from "../../services/hooks/useNoteAI";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 import { useGenerateFlashcards } from "../../services/hooks/useFlashcards";
@@ -318,11 +319,12 @@ export function NotesPage() {
   const userId = user?.uid ?? null;
 
   // React Query Hooks
-  const aiQA = useAIQA();
   const reindexNote = useReindexNote();
   const translateNote = useTranslateNote();
+  const extractGraph = useExtractGraph();
   const processDocument = useProcessDocument();
   const generateFlashcards = useGenerateFlashcards();
+  const startConversation = useStartConversation();
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -333,8 +335,8 @@ export function NotesPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatHistory, setChatHistory] = useState<ConversationMessage[]>([]);
   const [askAIScope, setAskAIScope] = useState<"note" | "folder" | "all">(
     "note"
   );
@@ -781,6 +783,22 @@ export function NotesPage() {
           });
         }
       }
+
+      // Only trigger graph extraction and reindexing if content is not empty
+      const hasContent = draft.content.trim().length > 0;
+
+      if (hasContent) {
+        // Silently update knowledge graph
+        extractGraph.mutate({
+          text: draft.content,
+          source_id: selectedNoteId,
+        });
+
+        // Silently reindex to Pinecone for RAG
+        reindexNote.mutate({
+          note_id: selectedNoteId,
+        });
+      }
     },
     [
       selectedNoteId,
@@ -790,6 +808,8 @@ export function NotesPage() {
       invalidateNotes,
       historyOpen,
       queryClient,
+      extractGraph,
+      reindexNote,
     ]
   );
 
@@ -1162,44 +1182,89 @@ export function NotesPage() {
 
   const handleAskAI = async () => {
     if (!askAIInput.trim()) return;
+    if (!selectedNoteId && askAIScope === "note") {
+      showSnackbar("No note selected", "error");
+      return;
+    }
+    if (!selectedFolderId && askAIScope === "folder") {
+      showSnackbar("No folder selected", "error");
+      return;
+    }
+
     setAskAILoading(true);
-    const nextHistory: ConversationMessage[] = [
-      ...chatHistory,
-      { role: "user", content: askAIInput },
-    ];
+    const userMessageText = askAIInput;
+    setAskAIInput("");
+
+    // Add user message to UI immediately
+    const userMsgId = crypto.randomUUID();
     setChatMessages((prev) => [
       ...prev,
       {
-        id: crypto.randomUUID(),
+        id: userMsgId,
         role: "user",
-        content: askAIInput,
+        content: userMessageText,
       },
     ]);
-    setAskAIInput("");
+
     try {
-      const data = await aiQA.mutateAsync({
-        question: askAIInput,
-        note_id: askAIScope === "note" ? (selectedNoteId ?? undefined) : undefined,
-        // scope: askAIScope, // API handles scope via note_id presence for now
-      });
-      const answerText = data.answer ?? "";
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: answerText,
-        },
-      ]);
-      setChatHistory([
-        ...nextHistory,
-        {
-          role: "assistant",
-          content: answerText,
-        },
-      ]);
+      // Create conversation if needed
+      if (!currentConversationId) {
+        let scope;
+        if (askAIScope === "note" && selectedNoteId) {
+          scope = { type: "doc" as const, ids: [selectedNoteId] };
+        } else if (askAIScope === "folder" && selectedFolderId) {
+          scope = { type: "folder" as const, ids: [selectedFolderId] };
+        } else {
+          scope = { type: "all" as const, ids: [] };
+        }
+
+        const conversationResult = await startConversation.mutateAsync({
+          scope,
+          title: `Chat about ${noteDetail?.title || "notes"}`,
+        });
+        setCurrentConversationId(conversationResult.conversation_id);
+
+        // Send the message in the new conversation
+        const response = await sendMessage(conversationResult.conversation_id, userMessageText);
+
+        // Add assistant response
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: response.answer,
+            citations: response.sources?.map((s) => ({
+              id: s.chunk_id,
+              note_id: s.note_id || "",
+              source_title: s.preview?.slice(0, 30) || "Source",
+              similarity: s.score,
+            })),
+          },
+        ]);
+      } else {
+        // Send message in existing conversation
+        const response = await sendMessage(currentConversationId, userMessageText);
+
+        // Add assistant response
+        setChatMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: response.answer,
+            citations: response.sources?.map((s) => ({
+              id: s.chunk_id,
+              note_id: s.note_id || "",
+              source_title: s.preview?.slice(0, 30) || "Source",
+              similarity: s.score,
+            })),
+          },
+        ]);
+      }
     } catch (error: any) {
-      showSnackbar(error?.message ?? "AI request failed", "error");
+      console.error("Chat error:", error);
+      showSnackbar(error?.message ?? "Failed to send message", "error");
     } finally {
       setAskAILoading(false);
     }
@@ -1457,6 +1522,7 @@ export function NotesPage() {
                 <Typography variant="body2" color="text.secondary" textAlign="center">
                   Create folders to organize your notes.
                 </Typography>
+
                 <Button
                   variant="outlined"
                   size="small"
@@ -1660,27 +1726,6 @@ export function NotesPage() {
                   </IconButton>
                 </span>
               </Tooltip>
-              <Tooltip title="Reindex note">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={async () => {
-                      if (!selectedNoteId) return;
-                      try {
-                        await reindexNote.mutateAsync({
-                          note_id: selectedNoteId,
-                        });
-                        showSnackbar("Note reindexed", "success");
-                      } catch (error: any) {
-                        showSnackbar(error?.message ?? "Reindex failed", "error");
-                      }
-                    }}
-                    disabled={!selectedNoteId}
-                  >
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
             </Stack>
           </Stack>
 
@@ -1711,10 +1756,19 @@ export function NotesPage() {
                 startIcon={<QuestionAnswerIcon />}
                 variant="contained"
                 color="secondary"
-                onClick={() => setChatOpen(true)}
+                onClick={() => {
+                  if (!selectedNoteId) {
+                    showSnackbar("Select a note first", "info");
+                    return;
+                  }
+                  // Just toggle the chat dialog - preserve history
+                  setChatOpen(true);
+                }}
+                disabled={!selectedNoteId}
               >
                 Ask AI
               </Button>
+
             </Stack>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button
@@ -2241,87 +2295,129 @@ export function NotesPage() {
         </Box>
       </Drawer>
 
-      <Drawer anchor="right" open={chatOpen} onClose={() => setChatOpen(false)}>
-        <Box sx={{ width: 420, height: "100%", display: "flex", flexDirection: "column" }}>
-          <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
+      <Dialog
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            position: 'fixed',
+            right: 24,
+            bottom: 24,
+            top: 'auto',
+            left: 'auto',
+            m: 0,
+            maxHeight: '70vh',
+            width: 450,
+          }
+        }}
+      >
+        <DialogTitle>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="h6">Ask AI</Typography>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <TextField
-                select
-                label="Scope"
+            <Stack direction="row" spacing={1}>
+              <Button
                 size="small"
-                value={askAIScope}
-                onChange={(event) =>
-                  setAskAIScope(event.target.value as "note" | "folder" | "all")
-                }
+                variant="outlined"
+                onClick={() => {
+                  setCurrentConversationId(null);
+                  setChatMessages([]);
+                  showSnackbar("Started new conversation", "info");
+                }}
               >
-                <MenuItem value="note">Current note</MenuItem>
-                <MenuItem value="folder">Current folder</MenuItem>
-                <MenuItem value="all">All notes</MenuItem>
-              </TextField>
+                New Chat
+              </Button>
+              <IconButton size="small" onClick={() => setChatOpen(false)}>
+                <DeleteIcon />
+              </IconButton>
             </Stack>
-          </Box>
-          <Box sx={{ flexGrow: 1, overflowY: "auto", p: 2 }}>
-            <Stack spacing={2}>
-              {chatMessages.map((message) => (
-                <Box
-                  key={message.id}
-                  sx={{
-                    alignSelf:
-                      message.role === "user" ? "flex-end" : "flex-start",
-                    bgcolor:
-                      message.role === "user"
-                        ? "primary.main"
-                        : alpha("#1e6ad4", 0.1),
-                    color: message.role === "user" ? "primary.contrastText" : "text.primary",
-                    p: 1.5,
-                    borderRadius: 2,
-                    maxWidth: "90%",
-                  }}
-                >
-                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                    {message.content}
-                  </Typography>
-                  {message.citations && (
-                    <Stack direction="row" spacing={0.5} mt={1} flexWrap="wrap">
-                      {message.citations.map((citation) => (
-                        <Chip
-                          key={citation.id}
-                          size="small"
-                          label={`${citation.source_title} (${citation.similarity.toFixed(2)})`}
-                        />
-                      ))}
-                    </Stack>
-                  )}
-                </Box>
-              ))}
-              {askAILoading && (
-                <Stack alignItems="center">
-                  <CircularProgress size={20} />
-                </Stack>
-              )}
-            </Stack>
-          </Box>
-          <Box sx={{ p: 2, borderTop: "1px solid", borderColor: "divider" }}>
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center" mt={1}>
             <TextField
-              multiline
-              minRows={2}
-              value={askAIInput}
-              onChange={(event) => setAskAIInput(event.target.value)}
-              placeholder="Ask something about your notes..."
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Button onClick={handleAskAI} disabled={askAILoading}>
-                      Send
-                    </Button>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Box>
-        </Box>
-      </Drawer>
+              select
+              label="Scope"
+              size="small"
+              value={askAIScope}
+              onChange={(event) =>
+                setAskAIScope(event.target.value as "note" | "folder" | "all")
+              }
+              fullWidth
+            >
+              <MenuItem value="note">Current note</MenuItem>
+              <MenuItem value="folder">Current folder</MenuItem>
+              <MenuItem value="all">All notes</MenuItem>
+            </TextField>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 2 }}>
+          <Stack spacing={2}>
+            {chatMessages.map((message) => (
+              <Box
+                key={message.id}
+                sx={{
+                  alignSelf:
+                    message.role === "user" ? "flex-end" : "flex-start",
+                  bgcolor:
+                    message.role === "user"
+                      ? "primary.main"
+                      : alpha("#1e6ad4", 0.1),
+                  color: message.role === "user" ? "primary.contrastText" : "text.primary",
+                  p: 1.5,
+                  borderRadius: 2,
+                  maxWidth: "90%",
+                }}
+              >
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                  {message.content}
+                </Typography>
+                {message.citations && (
+                  <Stack direction="row" spacing={0.5} mt={1} flexWrap="wrap">
+                    {message.citations.map((citation) => (
+                      <Chip
+                        key={citation.id}
+                        size="small"
+                        label={`${citation.source_title} (${citation.similarity.toFixed(2)})`}
+                      />
+                    ))}
+                  </Stack>
+                )}
+              </Box>
+            ))}
+            {askAILoading && (
+              <Stack alignItems="center">
+                <CircularProgress size={20} />
+              </Stack>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <TextField
+            fullWidth
+            multiline
+            maxRows={4}
+            value={askAIInput}
+            onChange={(event) => setAskAIInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleAskAI();
+              }
+            }}
+            placeholder="Ask something about your notes... (Enter to send, Shift+Enter for new line)"
+            disabled={askAILoading}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Button onClick={handleAskAI} disabled={askAILoading || !askAIInput.trim()}>
+                    Send
+                  </Button>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={snackbar.open}

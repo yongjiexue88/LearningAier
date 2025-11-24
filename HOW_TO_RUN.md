@@ -18,8 +18,10 @@ This guide will help you set up and run the LearningAier application locally.
 ```
 LearningAier/
 ├── frontend/              # React + Vite frontend
+│   ├── firestore.indexes.json # Firestore composite indexes
+│   └── ...
 ├── backend-fastapi/       # FastAPI backend
-└── firestore.indexes.json # Firestore composite indexes
+└── ...
 ```
 
 ---
@@ -164,9 +166,10 @@ Firestore missing index for folders (user_id + sort_order)
 
 ### Option 2: Manual via Firebase CLI
 
-Deploy the indexes from the project root:
+Deploy the indexes from the frontend directory:
 
 ```bash
+cd frontend
 firebase deploy --only firestore:indexes
 ```
 

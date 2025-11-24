@@ -3,6 +3,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DescriptionIcon from "@mui/icons-material/DescriptionRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNewRounded";
+import ChatIcon from "@mui/icons-material/ChatRounded";
 import {
   Box,
   Button,
@@ -20,7 +21,9 @@ import {
   Chip,
 } from "@mui/material";
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useStartConversation } from "../../hooks/useChat";
 import { useAuth } from "../../providers/AuthProvider";
 import { firebaseAuth, firebaseStorage, firebaseDb } from "../../lib/firebaseClient";
 import { ref, uploadBytesResumable } from "firebase/storage";
@@ -44,6 +47,7 @@ interface DocumentRecord {
 export function DocumentsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -53,6 +57,7 @@ export function DocumentsPage() {
   const [noteId, setNoteId] = useState<string | null>(null);
 
   const processDocumentMutation = useProcessDocument();
+  const startConversation = useStartConversation();
 
   const documentsQuery = useQuery({
     enabled: Boolean(user?.uid),
@@ -487,20 +492,43 @@ export function DocumentsPage() {
                   </Stack>
                 </CardContent>
                 <CardActions sx={{ justifyContent: "space-between", px: 2, pb: 2 }}>
-                  {document.note_id ? (
-                    <Button
-                      size="small"
-                      variant="contained"
-                      href={`/notes`}
-                      startIcon={<OpenInNewIcon />}
-                    >
-                      View Note
-                    </Button>
-                  ) : (
-                    <Typography variant="caption" color="text.secondary">
-                      No note yet
-                    </Typography>
-                  )}
+                  <Stack direction="row" spacing={1}>
+                    {document.note_id ? (
+                      <>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          href={`/notes`}
+                          startIcon={<OpenInNewIcon />}
+                        >
+                          View Note
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<ChatIcon />}
+                          onClick={async () => {
+                            try {
+                              const result = await startConversation.mutateAsync({
+                                scope: { type: "doc", ids: [document.note_id!] },
+                                title: `Chat about ${document.title}`
+                              });
+                              navigate(`/chat/${result.conversation_id}`);
+                            } catch (error) {
+                              setErrorMessage("Failed to start conversation");
+                            }
+                          }}
+                          disabled={startConversation.isPending}
+                        >
+                          Chat
+                        </Button>
+                      </>
+                    ) : (
+                      <Typography variant="caption" color="text.secondary">
+                        No note yet
+                      </Typography>
+                    )}
+                  </Stack>
                   <IconButton
                     size="small"
                     color="error"

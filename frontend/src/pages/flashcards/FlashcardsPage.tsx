@@ -2,6 +2,7 @@ import AddIcon from "@mui/icons-material/AddRounded";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesomeRounded";
 import DeleteIcon from "@mui/icons-material/DeleteOutlineRounded";
 import RefreshIcon from "@mui/icons-material/RefreshRounded";
+import ChatIcon from "@mui/icons-material/ChatRounded";
 import {
   Alert,
   Box,
@@ -35,6 +36,7 @@ import { FirebaseError } from "firebase/app";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   addDoc,
   collection,
@@ -53,6 +55,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
 import { firebaseDb } from "../../lib/firebaseClient";
 import { useGenerateFlashcards, useReviewFlashcard } from "../../services/hooks/useFlashcards";
+import { useStartConversation } from "../../hooks/useChat";
 
 dayjs.extend(relativeTime);
 
@@ -138,6 +141,8 @@ export function FlashcardsPage() {
   const { user } = useAuth();
   const userId = user?.uid ?? null;
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const startConversation = useStartConversation();
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>("");
   const [selectedNoteId, setSelectedNoteId] = useState<string>("");
@@ -611,6 +616,29 @@ export function FlashcardsPage() {
             disabled={!selectedNoteId || generateMutation.isPending}
           >
             {generateMutation.isPending ? "Generating..." : "Generate from note"}
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<ChatIcon />}
+            onClick={async () => {
+              if (!selectedNoteId) {
+                showSnackbar("Select a note first", "info");
+                return;
+              }
+              try {
+                const note = notesById.get(selectedNoteId);
+                const result = await startConversation.mutateAsync({
+                  scope: { type: "doc", ids: [selectedNoteId] },
+                  title: `Chat about ${note?.title || "flashcards"}`
+                });
+                navigate(`/chat/${result.conversation_id}`);
+              } catch (error) {
+                showSnackbar("Failed to start conversation", "error");
+              }
+            }}
+            disabled={!selectedNoteId || startConversation.isPending}
+          >
+            {startConversation.isPending ? "Starting..." : "Chat about this deck"}
           </Button>
         </Box>
       </Paper>

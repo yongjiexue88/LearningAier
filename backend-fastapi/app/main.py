@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import notes, documents, flashcards
+from app.api import notes, documents, flashcards, graph, chat
 import time
 import json
 
@@ -12,6 +12,15 @@ app = FastAPI(
     description="AI-powered note-taking and flashcard backend with RAG",
     version="2.0.0"
 )
+
+# ... (rest of the file)
+
+# Include routers
+app.include_router(notes.router)
+app.include_router(documents.router)
+app.include_router(flashcards.router)
+app.include_router(graph.router)
+app.include_router(chat.router)
 
 @app.on_event("startup")
 async def startup_event():
@@ -103,11 +112,6 @@ async def log_requests(request: Request, call_next):
     print(f"{'='*80}\n")
     
     return response
-
-# Include routers
-app.include_router(notes.router)
-app.include_router(documents.router)
-app.include_router(flashcards.router)
 
 
 @app.get("/")

@@ -111,6 +111,66 @@ class APIClient {
 
     return data as Promise<TResponse>;
   }
+
+  /**
+   * Convenience GET method
+   */
+  async get<TResponse>(
+    endpoint: string,
+    options: { requireAuth?: boolean } = {}
+  ): Promise<{ data: TResponse }> {
+    const data = await this.request<TResponse>(endpoint, {
+      method: "GET",
+      requireAuth: options.requireAuth,
+    });
+    return { data };
+  }
+
+  /**
+   * Convenience POST method
+   */
+  async post<TResponse, TBody = unknown>(
+    endpoint: string,
+    body?: TBody,
+    options: { requireAuth?: boolean } = {}
+  ): Promise<{ data: TResponse }> {
+    const data = await this.request<TResponse, TBody>(endpoint, {
+      method: "POST",
+      body,
+      requireAuth: options.requireAuth,
+    });
+    return { data };
+  }
+
+  /**
+   * Convenience PUT method
+   */
+  async put<TResponse, TBody = unknown>(
+    endpoint: string,
+    body?: TBody,
+    options: { requireAuth?: boolean } = {}
+  ): Promise<{ data: TResponse }> {
+    const data = await this.request<TResponse, TBody>(endpoint, {
+      method: "PUT",
+      body,
+      requireAuth: options.requireAuth,
+    });
+    return { data };
+  }
+
+  /**
+   * Convenience DELETE method
+   */
+  async delete<TResponse = void>(
+    endpoint: string,
+    options: { requireAuth?: boolean } = {}
+  ): Promise<{ data: TResponse }> {
+    const data = await this.request<TResponse>(endpoint, {
+      method: "DELETE",
+      requireAuth: options.requireAuth,
+    });
+    return { data };
+  }
 }
 
 export const apiClient = new APIClient();

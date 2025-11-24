@@ -46,3 +46,18 @@ async def verify_firebase_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}"
         )
+
+
+async def get_current_user_id(
+    user: AuthenticatedUser = Depends(verify_firebase_token)
+) -> str:
+    """
+    Get the current user's ID from the authenticated user.
+    Convenience dependency for endpoints that only need the user ID.
+    
+    Example:
+        @app.get("/protected")
+        async def protected_route(user_id: str = Depends(get_current_user_id)):
+            return {"user_id": user_id}
+    """
+    return user.uid

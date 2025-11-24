@@ -24,11 +24,14 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../providers/AuthProvider";
 import { useState } from "react";
 
+import HubIcon from "@mui/icons-material/HubRounded";
+
 const workspaceItems = [
   { label: "Dashboard", icon: <DashboardIcon />, to: "/" },
   { label: "Notes", icon: <NotesIcon />, to: "/notes", primary: true },
   { label: "Flashcards", icon: <FlashcardIcon />, to: "/flashcards" },
   { label: "Documents", icon: <DocumentIcon />, to: "/documents" },
+  { label: "Knowledge Graph", icon: <HubIcon />, to: "/graph" },
 ];
 
 const toolItems = [{ label: "Pomodoro & Tasks", icon: <PomodoroIcon />, to: "/pomodoro" }];

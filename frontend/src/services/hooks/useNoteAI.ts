@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { notesApi } from "../api/notes";
+import { graphApi } from "../api/graph";
 import type {
     AIQARequest,
     ReindexNoteRequest,
     TranslateNoteRequest,
     ExtractTerminologyRequest,
+    ExtractGraphRequest,
 } from "../api/types";
 
 /**
@@ -64,6 +66,24 @@ export function useExtractTerminology() {
             notesApi.extractTerminology(request),
         onError: (error: Error) => {
             console.error("Terminology extraction failed:", error.message);
+        },
+    });
+}
+
+/**
+ * Hook for graph extraction
+ */
+export function useExtractGraph() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (request: ExtractGraphRequest) => graphApi.extract(request),
+        onSuccess: () => {
+            // Invalidate graph query
+            queryClient.invalidateQueries({ queryKey: ["knowledge-graph"] });
+        },
+        onError: (error: Error) => {
+            console.error("Graph extraction failed:", error.message);
         },
     });
 }

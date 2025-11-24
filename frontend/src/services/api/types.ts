@@ -100,3 +100,87 @@ export interface ReviewFlashcardResponse {
     interval: number;
     ease_factor: number;
 }
+
+// Graph API types
+export interface ExtractGraphRequest {
+    text: string;
+    source_id: string;
+}
+
+export interface GraphNode {
+    id: string;
+    label: string;
+    type: string;
+    source_ids: string[];
+}
+
+export interface GraphEdge {
+    id: string;
+    from: string;
+    to: string;
+    relation: string;
+    source_id: string;
+}
+
+export interface GraphData {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+// Chat API types
+export interface ChatScope {
+    type: "doc" | "folder" | "all";
+    ids: string[];
+}
+
+export interface StartConversationRequest {
+    scope: ChatScope;
+    title?: string;
+}
+
+export interface StartConversationResponse {
+    conversation_id: string;
+}
+
+export interface SendMessageRequest {
+    message: string;
+}
+
+export interface SourceChunk {
+    chunk_id: string;
+    note_id: string | null;
+    doc_id: string | null;
+    score: number;
+    preview: string;
+}
+
+export interface SendMessageResponse {
+    answer: string;
+    sources: SourceChunk[];
+}
+
+export interface MessageItem {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    created_at: string;
+    sources?: SourceChunk[];
+}
+
+export interface ConversationListItem {
+    id: string;
+    title: string;
+    scope: ChatScope;
+    created_at: string;
+    updated_at: string;
+    message_count?: number;
+}
+
+export interface ConversationDetail {
+    id: string;
+    title: string;
+    scope: ChatScope;
+    created_at: string;
+    updated_at: string;
+    messages: MessageItem[];
+}

@@ -132,6 +132,8 @@ export function SettingsPage() {
               <MenuItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</MenuItem>
               <MenuItem value="gemini-2.5-flash-tts">Gemini 2.5 Flash TTS</MenuItem>
               <MenuItem value="gemini-2.5-flash">Gemini 2.5 Flash</MenuItem>
+              <MenuItem value="gemini-2.5-pro">Gemini 2.5 Pro</MenuItem>
+              <MenuItem value="gemini-3-pro">Gemini 3 Pro</MenuItem>
             </TextField>
             <TextField
               label="Preferred language"
