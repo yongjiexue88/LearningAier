@@ -50,6 +50,7 @@ import {
   writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
+  Timestamp,
 } from "firebase/firestore";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
@@ -122,15 +123,36 @@ function mapNoteDoc(docSnap: QueryDocumentSnapshot<DocumentData>): NoteListItem 
 function mapFlashcardDoc(
   docSnap: QueryDocumentSnapshot<DocumentData>
 ): FlashcardRecord {
-  const data = docSnap.data() as Omit<FlashcardRecord, "id">;
-  return { id: docSnap.id, ...data };
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    user_id: data.user_id,
+    note_id: data.note_id,
+    document_id: data.document_id,
+    set_id: data.set_id,
+    term: data.term,
+    definition: data.definition,
+    context: data.context,
+    category: data.category,
+    next_due_at: data.next_due_at instanceof Timestamp ? data.next_due_at.toDate().toISOString() : data.next_due_at,
+    created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
+    updated_at: data.updated_at instanceof Timestamp ? data.updated_at.toDate().toISOString() : data.updated_at,
+  } as FlashcardRecord;
 }
 
 function mapReviewDoc(
   docSnap: QueryDocumentSnapshot<DocumentData>
 ): FlashcardReviewRecord {
-  const data = docSnap.data() as Omit<FlashcardReviewRecord, "id">;
-  return { id: docSnap.id, ...data };
+  const data = docSnap.data();
+  return {
+    id: docSnap.id,
+    flashcard_id: data.flashcard_id,
+    user_id: data.user_id,
+    response: data.response,
+    reviewed_at: data.reviewed_at instanceof Timestamp ? data.reviewed_at.toDate().toISOString() : data.reviewed_at,
+    next_due_at: data.next_due_at instanceof Timestamp ? data.next_due_at.toDate().toISOString() : data.next_due_at,
+    interval_days: data.interval_days,
+  } as FlashcardReviewRecord;
 }
 
 function isMissingIndexError(error: unknown): error is FirebaseError {
@@ -541,105 +563,116 @@ export function FlashcardsPage() {
   }, [filteredFlashcards, page, rowsPerPage]);
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={4}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>
+        <Typography variant="h4" fontWeight={600} gutterBottom>
           Flashcards
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body1" color="text.secondary">
           Create, review, and track bilingual flashcards with spaced repetition powered by Firestore.
         </Typography>
       </Box>
 
-      <Paper sx={{ p: 2 }}>
+      <Paper sx={{ p: { xs: 2, sm: 2.5 }, width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
         <Box
           sx={{
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "repeat(5, 1fr)" },
+            display: "flex",
+            flexDirection: "column",
             gap: 2,
           }}
         >
-          <TextField
-            select
-            label="Folder"
-            size="small"
-            value={selectedFolderId}
-            onChange={(event) => {
-              setSelectedFolderId(event.target.value);
-              setSelectedNoteId("");
-            }}
-          >
-            <MenuItem value="">All folders</MenuItem>
-            {(foldersQuery.data ?? []).map((folder) => (
-              <MenuItem key={folder.id} value={folder.id}>
-                {folder.name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            select
-            label="Note"
-            size="small"
-            value={selectedNoteId}
-            onChange={(event) => setSelectedNoteId(event.target.value)}
-            SelectProps={{ displayEmpty: true }}
-          >
-            <MenuItem value="">All notes</MenuItem>
-            {availableNotes.map((note) => (
-              <MenuItem key={note.id} value={note.id}>
-                {note.title || "Untitled"}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Switch
-              checked={dueOnly}
-              onChange={(event) => setDueOnly(event.target.checked)}
-              inputProps={{ "aria-label": "Due today only" }}
-            />
-            <Typography variant="body2">Due today only</Typography>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 2 }}>
+            <TextField
+              select
+              label="Folder"
+              size="small"
+              value={selectedFolderId}
+              onChange={(event) => {
+                setSelectedFolderId(event.target.value);
+                setSelectedNoteId("");
+              }}
+            >
+              <MenuItem value="">All folders</MenuItem>
+              {(foldersQuery.data ?? []).map((folder) => (
+                <MenuItem key={folder.id} value={folder.id}>
+                  {folder.name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              select
+              label="Note"
+              size="small"
+              value={selectedNoteId}
+              onChange={(event) => setSelectedNoteId(event.target.value)}
+              SelectProps={{ displayEmpty: true }}
+            >
+              <MenuItem value="">All notes</MenuItem>
+              {availableNotes.map((note) => (
+                <MenuItem key={note.id} value={note.id}>
+                  {note.title || "Untitled"}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ width: '100%' }}>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
+              <Switch
+                checked={dueOnly}
+                onChange={(event) => setDueOnly(event.target.checked)}
+                inputProps={{ "aria-label": "Due today only" }}
+              />
+              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Due today only</Typography>
+            </Stack>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
+                queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] })
+              }
+              }
+              size="small"
+              fullWidth={{ xs: true, sm: false }}
+            >
+              Refresh
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={handleGenerate}
+              disabled={!selectedNoteId || generateMutation.isPending}
+              size="small"
+              fullWidth={{ xs: true, sm: false }}
+            >
+              {generateMutation.isPending ? "Generating..." : "Generate from note"}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<ChatIcon />}
+              onClick={async () => {
+                if (!selectedNoteId) {
+                  showSnackbar("Select a note first", "info");
+                  return;
+                }
+                try {
+                  const note = notesById.get(selectedNoteId);
+                  const result = await startConversation.mutateAsync({
+                    scope: { type: "doc", ids: [selectedNoteId] },
+                    title: `Chat about ${note?.title || "flashcards"}`
+                  });
+                  navigate(`/chat/${result.conversation_id}`);
+                } catch (error) {
+                  showSnackbar("Failed to start conversation", "error");
+                }
+              }}
+              disabled={!selectedNoteId || startConversation.isPending}
+              size="small"
+              fullWidth={{ xs: true, sm: false }}
+            >
+              {startConversation.isPending ? "Starting..." : "Chat about deck"}
+            </Button>
           </Stack>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
-              queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
-            }}
-          >
-            Refresh
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AutoAwesomeIcon />}
-            onClick={handleGenerate}
-            disabled={!selectedNoteId || generateMutation.isPending}
-          >
-            {generateMutation.isPending ? "Generating..." : "Generate from note"}
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<ChatIcon />}
-            onClick={async () => {
-              if (!selectedNoteId) {
-                showSnackbar("Select a note first", "info");
-                return;
-              }
-              try {
-                const note = notesById.get(selectedNoteId);
-                const result = await startConversation.mutateAsync({
-                  scope: { type: "doc", ids: [selectedNoteId] },
-                  title: `Chat about ${note?.title || "flashcards"}`
-                });
-                navigate(`/chat/${result.conversation_id}`);
-              } catch (error) {
-                showSnackbar("Failed to start conversation", "error");
-              }
-            }}
-            disabled={!selectedNoteId || startConversation.isPending}
-          >
-            {startConversation.isPending ? "Starting..." : "Chat about this deck"}
-          </Button>
         </Box>
       </Paper>
 
@@ -650,11 +683,11 @@ export function FlashcardsPage() {
           gap: 2,
         }}
       >
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="overline" color="text.secondary">
+        <Paper sx={{ p: 2.5 }}>
+          <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.6875rem', fontWeight: 600 }}>
             Due today
           </Typography>
-          <Typography variant="h4">{stats.due}</Typography>
+          <Typography variant="h4" fontWeight={600}>{stats.due}</Typography>
           <Typography variant="body2" color="text.secondary">
             Cards needing attention before midnight.
           </Typography>

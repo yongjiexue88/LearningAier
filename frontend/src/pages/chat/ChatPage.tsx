@@ -77,29 +77,40 @@ export function ChatPage() {
     };
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', height: '100vh', width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
             {/* Left Sidebar - Conversation List */}
             <Paper
                 elevation={0}
                 sx={{
-                    width: 280,
+                    width: { xs: '100%', md: 280 },
+                    display: { xs: 'none', md: 'flex' },
                     borderRight: 1,
                     borderColor: 'divider',
-                    display: 'flex',
                     flexDirection: 'column',
+                    flexShrink: 0,
                 }}
             >
                 {/* Header */}
-                <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+                <Box sx={{ p: 2.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <ChatIcon color="primary" />
-                            <Typography variant="h6" fontWeight={700}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <ChatIcon color="primary" fontSize="medium" />
+                            <Typography variant="h6" fontWeight={600}>
                                 AI Tutor
                             </Typography>
                         </Box>
-                        <IconButton size="small" onClick={handleNewConversation} title="New conversation">
-                            <AddIcon />
+                        <IconButton
+                            size="small"
+                            onClick={handleNewConversation}
+                            title="New conversation"
+                            sx={{
+                                borderRadius: 1.5,
+                                '&:hover': {
+                                    bgcolor: 'action.hover',
+                                },
+                            }}
+                        >
+                            <AddIcon fontSize="small" />
                         </IconButton>
                     </Box>
                 </Box>
@@ -135,10 +146,18 @@ export function ChatPage() {
                             selected={conv.id === conversationId}
                             onClick={() => navigate(`/chat/${conv.id}`)}
                             sx={{
-                                borderBottom: 1,
-                                borderColor: 'divider',
+                                mx: 1,
+                                my: 0.5,
+                                borderRadius: 2,
                                 '&.Mui-selected': {
-                                    bgcolor: 'action.selected',
+                                    bgcolor: 'primary.main',
+                                    color: 'primary.contrastText',
+                                    '&:hover': {
+                                        bgcolor: 'primary.main',
+                                    },
+                                },
+                                '&:hover:not(.Mui-selected)': {
+                                    bgcolor: 'action.hover',
                                 },
                             }}
                         >
@@ -147,10 +166,14 @@ export function ChatPage() {
                                 secondary={`${conv.message_count || 0} messages`}
                                 primaryTypographyProps={{
                                     noWrap: true,
-                                    fontWeight: conv.id === conversationId ? 600 : 400,
+                                    fontWeight: conv.id === conversationId ? 600 : 500,
+                                    fontSize: '0.9375rem',
+                                    color: conv.id === conversationId ? 'inherit' : 'text.primary',
                                 }}
                                 secondaryTypographyProps={{
                                     variant: 'caption',
+                                    fontSize: '0.75rem',
+                                    color: conv.id === conversationId ? 'inherit' : 'text.secondary',
                                 }}
                             />
                         </ListItemButton>
@@ -189,7 +212,7 @@ export function ChatPage() {
                         {/* Chat Header */}
                         <Box
                             sx={{
-                                p: 2,
+                                p: 2.5,
                                 borderBottom: 1,
                                 borderColor: 'divider',
                                 bgcolor: 'background.paper',
@@ -206,10 +229,16 @@ export function ChatPage() {
                             </Box>
                             <IconButton
                                 onClick={() => setDeleteDialogOpen(true)}
-                                color="error"
                                 size="small"
+                                sx={{
+                                    color: 'text.secondary',
+                                    '&:hover': {
+                                        color: 'error.main',
+                                        bgcolor: 'rgba(239, 68, 68, 0.04)',
+                                    },
+                                }}
                             >
-                                <DeleteIcon />
+                                <DeleteIcon fontSize="small" />
                             </IconButton>
                         </Box>
 
@@ -247,15 +276,24 @@ export function ChatPage() {
             </Box>
 
             {/* Delete Confirmation Dialog */}
-            <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-                <DialogTitle>Delete Conversation</DialogTitle>
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        p: 1,
+                    },
+                }}
+            >
+                <DialogTitle sx={{ fontWeight: 600 }}>Delete Conversation</DialogTitle>
                 <DialogContent>
-                    <Typography>
+                    <Typography variant="body2" color="text.secondary">
                         Are you sure you want to delete this conversation? This action cannot be undone.
                     </Typography>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                <DialogActions sx={{ px: 3, pb: 2 }}>
+                    <Button onClick={() => setDeleteDialogOpen(false)} variant="outlined">Cancel</Button>
                     <Button
                         onClick={handleDeleteConversation}
                         color="error"

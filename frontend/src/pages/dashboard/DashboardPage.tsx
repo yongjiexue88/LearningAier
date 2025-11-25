@@ -15,9 +15,9 @@ const quickActions = [
 
 export function DashboardPage() {
   return (
-    <Stack spacing={3}>
+    <Stack spacing={4}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>
+        <Typography variant="h4" fontWeight={600} gutterBottom>
           Dashboard
         </Typography>
         <Typography variant="body1" color="text.secondary">
@@ -30,19 +30,35 @@ export function DashboardPage() {
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
-          gap: 2,
+          gap: 3,
         }}
       >
         {quickActions.map((action) => (
-          <Card key={action.label}>
-            <CardContent>
-              <Typography variant="subtitle1" fontWeight={600}>
+          <Card
+            key={action.label}
+            sx={{
+              transition: "all 0.2s ease",
+              "&:hover": {
+                transform: "translateY(-2px)",
+                boxShadow: "0 8px 16px rgba(15, 23, 42, 0.08)",
+              },
+            }}
+          >
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" fontWeight={600} gutterBottom>
                 {action.label}
               </Typography>
-              <Typography variant="body2" color="text.secondary" mb={2}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
                 {action.description}
               </Typography>
-              <Button variant="contained" size="small" href={action.path}>
+              <Button
+                variant="contained"
+                size="medium"
+                href={action.path}
+                sx={{
+                  borderRadius: 2,
+                }}
+              >
                 Go
               </Button>
             </CardContent>

@@ -25,6 +25,7 @@ import { useAuth } from "../providers/AuthProvider";
 import { useState } from "react";
 
 import HubIcon from "@mui/icons-material/HubRounded";
+import ChatIcon from "@mui/icons-material/ChatRounded";
 
 const workspaceItems = [
   { label: "Dashboard", icon: <DashboardIcon />, to: "/" },
@@ -32,6 +33,7 @@ const workspaceItems = [
   { label: "Flashcards", icon: <FlashcardIcon />, to: "/flashcards" },
   { label: "Documents", icon: <DocumentIcon />, to: "/documents" },
   { label: "Knowledge Graph", icon: <HubIcon />, to: "/graph" },
+  { label: "AI Chat", icon: <ChatIcon />, to: "/chat" },
 ];
 
 const toolItems = [{ label: "Pomodoro & Tasks", icon: <PomodoroIcon />, to: "/pomodoro" }];
@@ -60,37 +62,58 @@ export function SidebarContent({
         display: "flex",
         flexDirection: "column",
         transition: "width 0.2s ease",
+        bgcolor: "background.paper",
       }}
     >
       <Stack
         spacing={1}
-        sx={{ p: 2, pb: 1, alignItems: "flex-start" }}
+        sx={{ p: 2, pb: 1.5, alignItems: "flex-start" }}
         direction="row"
         justifyContent="space-between"
       >
         {!collapsed && (
           <Stack spacing={0.5}>
-            <Typography variant="h6" fontWeight={700}>
+            <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.125rem" }}>
               Study Assistant
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Bilingual AI-powered study workspace
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+              AI-powered study workspace
             </Typography>
           </Stack>
         )}
-        <IconButton size="small" onClick={onToggleCollapse} sx={{ ml: "auto" }}>
-          {collapsed ? <MenuOpenIcon /> : <CloseIcon />}
+        <IconButton
+          size="small"
+          onClick={onToggleCollapse}
+          sx={{
+            ml: "auto",
+            color: "text.secondary",
+            "&:hover": {
+              color: "primary.main",
+              bgcolor: "action.hover",
+            }
+          }}
+        >
+          {collapsed ? <MenuOpenIcon fontSize="small" /> : <CloseIcon fontSize="small" />}
         </IconButton>
       </Stack>
-      <Divider />
+      <Divider sx={{ borderColor: "divider" }} />
       <Stack spacing={3} sx={{ p: 2, flexGrow: 1, overflow: "auto" }}>
         <Box>
           {!collapsed && (
-            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 0.6 }}>
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{
+                letterSpacing: 0.8,
+                fontSize: "0.6875rem",
+                fontWeight: 600,
+                px: 1.5,
+              }}
+            >
               Workspace
             </Typography>
           )}
-          <List disablePadding>
+          <List disablePadding sx={{ mt: collapsed ? 0 : 0.5 }}>
             {workspaceItems.map((item) => (
               <ListItemButton
                 key={item.to}
@@ -98,11 +121,14 @@ export function SidebarContent({
                 to={item.to}
                 onClick={onNavigate}
                 sx={{
-                  borderRadius: 10,
-                  px: collapsed ? 0.5 : 1.5,
+                  borderRadius: 2,
+                  px: collapsed ? 1 : 1.5,
+                  py: 1,
                   mt: 0.5,
+                  minHeight: 40,
                   "& .MuiListItemIcon-root": {
-                    color: item.primary ? "primary.main" : "text.secondary",
+                    color: "text.secondary",
+                    minWidth: collapsed ? 0 : 36,
                   },
                   "&.active": {
                     backgroundColor: "primary.main",
@@ -110,18 +136,24 @@ export function SidebarContent({
                     "& .MuiListItemIcon-root": {
                       color: "primary.contrastText",
                     },
-                    boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+                    boxShadow: "0 2px 8px rgba(37, 99, 235, 0.2)",
+                  },
+                  "&:hover:not(.active)": {
+                    backgroundColor: "action.hover",
+                    "& .MuiListItemIcon-root": {
+                      color: "primary.main",
+                    },
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 0.5 }}>
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 1.5 }}>
                   {item.icon}
                 </ListItemIcon>
                 {!collapsed && (
                   <ListItemText
                     primaryTypographyProps={{
-                      fontWeight: item.primary ? 700 : 600,
-                      fontSize: "0.95rem",
+                      fontWeight: item.primary ? 600 : 500,
+                      fontSize: "0.9375rem",
                     }}
                     primary={item.label}
                   />
@@ -133,11 +165,20 @@ export function SidebarContent({
 
         <Box>
           {!collapsed && (
-            <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 0.6 }}>
+            <Typography
+              variant="overline"
+              color="text.secondary"
+              sx={{
+                letterSpacing: 0.8,
+                fontSize: "0.6875rem",
+                fontWeight: 600,
+                px: 1.5,
+              }}
+            >
               Tools
             </Typography>
           )}
-          <List disablePadding>
+          <List disablePadding sx={{ mt: collapsed ? 0 : 0.5 }}>
             {toolItems.map((item) => (
               <ListItemButton
                 key={item.to}
@@ -145,13 +186,22 @@ export function SidebarContent({
                 to={item.to}
                 onClick={onNavigate}
                 sx={{
-                  borderRadius: 10,
-                  px: collapsed ? 0.5 : 1.5,
+                  borderRadius: 2,
+                  px: collapsed ? 1 : 1.5,
+                  py: 1,
                   mt: 0.5,
+                  minHeight: 40,
                   "& .MuiListItemIcon-root": {
                     color: "text.secondary",
                   },
                   "&.active": {
+                    backgroundColor: "action.selected",
+                    color: "primary.main",
+                    "& .MuiListItemIcon-root": {
+                      color: "primary.main",
+                    },
+                  },
+                  "&:hover:not(.active)": {
                     backgroundColor: "action.hover",
                     "& .MuiListItemIcon-root": {
                       color: "primary.main",
@@ -159,14 +209,14 @@ export function SidebarContent({
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 0.5 }}>
+                <ListItemIcon sx={{ minWidth: collapsed ? 0 : 36, mr: collapsed ? 0 : 1.5 }}>
                   {item.icon}
                 </ListItemIcon>
                 {!collapsed && (
                   <ListItemText
                     primaryTypographyProps={{
-                      fontWeight: 600,
-                      fontSize: "0.95rem",
+                      fontWeight: 500,
+                      fontSize: "0.9375rem",
                     }}
                     primary={item.label}
                   />
@@ -177,28 +227,35 @@ export function SidebarContent({
         </Box>
       </Stack>
 
-      <Box sx={{ p: collapsed ? 1 : 2, borderTop: "1px solid", borderColor: "divider" }}>
+      <Box sx={{ p: collapsed ? 1.5 : 2, borderTop: "1px solid", borderColor: "divider" }}>
         <Stack
           direction={collapsed ? "column" : "row"}
-          spacing={collapsed ? 0.5 : 1}
+          spacing={collapsed ? 0.5 : 1.5}
           alignItems="center"
           justifyContent={collapsed ? "center" : "space-between"}
         >
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1.5} alignItems="center">
             <IconButton
               onClick={(e) => setAccountAnchor(e.currentTarget)}
-              sx={{ p: 0.5 }}
+              sx={{
+                p: 0.5,
+                "&:hover": {
+                  "& .MuiAvatar-root": {
+                    boxShadow: "0 0 0 3px rgba(37, 99, 235, 0.1)",
+                  }
+                }
+              }}
             >
-              <Avatar sx={{ bgcolor: "primary.main", width: 36, height: 36 }}>
+              <Avatar sx={{ bgcolor: "primary.main", width: 36, height: 36, fontSize: "0.875rem", fontWeight: 600 }}>
                 {initials}
               </Avatar>
             </IconButton>
             {!collapsed && (
               <Box>
-                <Typography variant="body2" fontWeight={700}>
+                <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.875rem" }}>
                   {user?.displayName ?? user?.email ?? "User"}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
                   {user?.email}
                 </Typography>
               </Box>
@@ -211,10 +268,17 @@ export function SidebarContent({
           onClose={() => setAccountAnchor(null)}
           anchorOrigin={{ vertical: "top", horizontal: "left" }}
           transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+          sx={{
+            "& .MuiPaper-root": {
+              borderRadius: 2,
+              minWidth: 200,
+              boxShadow: "0 4px 12px rgba(15, 23, 42, 0.1)",
+            },
+          }}
         >
           <MenuItem disabled>
             <Stack>
-              <Typography variant="body2" fontWeight={700}>
+              <Typography variant="body2" fontWeight={600}>
                 {user?.displayName ?? "Account"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -222,7 +286,7 @@ export function SidebarContent({
               </Typography>
             </Stack>
           </MenuItem>
-          <Divider />
+          <Divider sx={{ my: 0.5 }} />
           <MenuItem
             component={NavLink}
             to="/settings"
@@ -230,14 +294,29 @@ export function SidebarContent({
               setAccountAnchor(null);
               onNavigate?.();
             }}
+            sx={{
+              borderRadius: 1,
+              mx: 0.5,
+              "&:hover": {
+                bgcolor: "action.hover",
+              },
+            }}
           >
-            <SettingsIcon fontSize="small" sx={{ mr: 1 }} />
+            <SettingsIcon fontSize="small" sx={{ mr: 1.5, color: "text.secondary" }} />
             Settings
           </MenuItem>
           <MenuItem
             onClick={() => {
               setAccountAnchor(null);
               void signOut();
+            }}
+            sx={{
+              borderRadius: 1,
+              mx: 0.5,
+              color: "error.main",
+              "&:hover": {
+                bgcolor: "rgba(239, 68, 68, 0.04)",
+              },
             }}
           >
             Sign out

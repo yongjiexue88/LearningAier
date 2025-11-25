@@ -92,20 +92,20 @@ export function SettingsPage() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={4}>
       <Box>
-        <Typography variant="h4" fontWeight={700}>
+        <Typography variant="h4" fontWeight={600} gutterBottom>
           Settings
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body1" color="text.secondary">
           Configure preferred LLM provider, model, and language defaults. These values are saved to your
           Firestore profile and used by flashcard and notes AI workflows.
         </Typography>
       </Box>
 
       <Card>
-        <CardContent>
-          <Stack spacing={2}>
+        <CardContent sx={{ p: 3 }}>
+          <Stack spacing={3}>
             <TextField
               select
               label="LLM Provider"
@@ -148,6 +148,7 @@ export function SettingsPage() {
                 variant="contained"
                 onClick={handleSave}
                 disabled={saving || loading || !user}
+                sx={{ minWidth: 140 }}
               >
                 {saving ? "Saving..." : "Save settings"}
               </Button>
@@ -167,7 +168,7 @@ export function SettingsPage() {
           onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           variant="filled"
-          sx={{ width: "100%" }}
+          sx={{ width: "100%", borderRadius: 2 }}
         >
           {snackbar.message}
         </Alert>

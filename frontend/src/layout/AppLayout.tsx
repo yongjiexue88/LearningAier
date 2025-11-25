@@ -28,6 +28,9 @@ export function AppLayout() {
           "& .MuiDrawer-paper": {
             boxSizing: "border-box",
             width: 260,
+            bgcolor: "background.paper",
+            borderRight: "1px solid",
+            borderColor: "divider",
           },
         }}
       >
@@ -48,7 +51,7 @@ export function AppLayout() {
           component="main"
           sx={{
             flexGrow: 1,
-            p: { xs: 2, md: 4 },
+            p: { xs: 2, md: 3 },
             position: "relative",
           }}
         >
@@ -58,11 +61,17 @@ export function AppLayout() {
             sx={{
               display: { md: "none" },
               position: "fixed",
-              top: 12,
-              left: 12,
+              top: 16,
+              left: 16,
               zIndex: 1200,
               bgcolor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
               boxShadow: 1,
+              "&:hover": {
+                bgcolor: "background.paper",
+                borderColor: "primary.main",
+              },
             }}
           >
             <MenuIcon />

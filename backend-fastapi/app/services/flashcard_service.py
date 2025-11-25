@@ -28,10 +28,21 @@ class FlashcardService:
             raise UnauthorizedError("Unauthorized access to note")
             
         # 2. Get content
-        content = note_data.get("content_md_zh", "") + "\n" + note_data.get("content_md_en", "")
+        content = (note_data.get("content_md_zh", "") or "") + "\n" + (note_data.get("content_md_en", "") or "")
+        
+        if not content.strip():
+            print(f"[WARN] Note {note_id} has empty content. Skipping flashcard generation.")
+            return {
+                "flashcards": [],
+                "note_id": note_id
+            }
         
         # 3. Generate with LLM
-        cards_data = await self.llm_service.generate_flashcards(content, count)
+        try:
+            cards_data = await self.llm_service.generate_flashcards(content, count)
+        except Exception as e:
+            print(f"[ERROR] LLM generation failed: {e}")
+            raise e
         
         # 4. Save to Firestore
         batch = self.db.batch()

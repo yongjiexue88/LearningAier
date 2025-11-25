@@ -1,3 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #F4F5F7;
+    color: #111827;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+  }
+}
+
+@layer components {
+
+  /* Notebook paper container */
+  .notebook-container {
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    border: 1px solid #E5E7EB;
+    max-width: 100%;
+  }
+
+  /* Optional paper texture/lines (very subtle) */
+  .notebook-paper {
+    background-color: #FFFFFF;
+    background-image:
+      linear-gradient(rgba(229, 231, 235, 0.15) 1px, transparent 1px);
+    background-size: 100% 24px;
+  }
+
+  /* Soft shadow utility */
+  .shadow-soft {
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  }
+
+  .shadow-subtle {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Toolbar styles */
+  .toolbar-minimal {
+    background-color: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
+  }
+}

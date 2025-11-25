@@ -81,17 +81,22 @@ export function KnowledgeGraphPage() {
     };
 
     return (
-        <Stack spacing={3} sx={{ height: "calc(100vh - 100px)" }}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Stack spacing={4} sx={{ height: { xs: 'calc(100vh - 120px)', md: 'calc(100vh - 100px)' }, width: '100%', maxWidth: '100vw', overflow: 'hidden' }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
                 <Box>
-                    <Typography variant="h4" fontWeight={700}>
+                    <Typography variant="h4" fontWeight={600} gutterBottom>
                         Knowledge Graph
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body1" color="text.secondary">
                         Explore connections between your concepts.
                     </Typography>
                 </Box>
-                <Button startIcon={<RefreshIcon />} onClick={() => refetch()}>
+                <Button
+                    startIcon={<RefreshIcon />}
+                    onClick={() => refetch()}
+                    variant="outlined"
+                    size="small"
+                >
                     Refresh
                 </Button>
             </Box>
@@ -101,10 +106,11 @@ export function KnowledgeGraphPage() {
                 sx={{
                     flexGrow: 1,
                     overflow: "hidden",
-                    borderRadius: 2,
+                    borderRadius: 3,
                     border: "1px solid",
                     borderColor: "divider",
-                    position: "relative"
+                    position: "relative",
+                    bgcolor: "background.paper",
                 }}
             >
                 {isLoading && (
@@ -112,7 +118,7 @@ export function KnowledgeGraphPage() {
                         position: "absolute",
                         top: 0, left: 0, right: 0, bottom: 0,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        zIndex: 10, bgcolor: "rgba(255,255,255,0.8)"
+                        zIndex: 10, bgcolor: "rgba(255,255,255,0.9)"
                     }}>
                         <CircularProgress />
                     </Box>
@@ -125,9 +131,9 @@ export function KnowledgeGraphPage() {
                         height={containerDimensions.height}
                         graphData={graphData}
                         nodeLabel="label"
-                        nodeColor={(node: any) => node.type === "concept" ? "#4caf50" : "#2196f3"}
+                        nodeColor={(node: any) => node.type === "concept" ? "#2563EB" : "#6B7280"}
                         nodeRelSize={6}
-                        linkColor={() => "#e0e0e0"}
+                        linkColor={() => "#E5E7EB"}
                         linkWidth={1.5}
                         linkDirectionalArrowLength={3.5}
                         linkDirectionalArrowRelPos={1}
