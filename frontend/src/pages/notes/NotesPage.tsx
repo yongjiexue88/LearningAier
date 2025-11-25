@@ -56,7 +56,6 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useAuth } from "../../providers/AuthProvider";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStartConversation, useStreamMessage, useConversation } from "../../hooks/useChat";
-import { sendMessage } from "../../services/api/chat";
 import { saveAs } from "file-saver";
 import {
   buildFolderTree,
@@ -765,6 +764,15 @@ export function NotesPage() {
       if (!selectedNoteId || !userId) return;
       setAutoSaveState("saving");
       const draft = draftOverride ?? noteDraft;
+
+      // Safety guard: Prevent auto-save from overwriting content with empty draft
+      // This protects against race conditions where draft hasn't initialized yet
+      const persistedContent = noteDetail?.content_md_en ?? noteDetail?.content_md_zh ?? "";
+      if (reason === "auto" && draft.content.trim().length === 0 && persistedContent.length > 20) {
+        console.warn("[Autosave] Prevented overwriting non-empty note with empty draft");
+        return;
+      }
+
       const stats = computeWordStats(draft.content);
       await updateDoc(doc(firebaseDb, "notes", selectedNoteId), {
         title: draft.title.trim() || "Untitled note",

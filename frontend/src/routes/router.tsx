@@ -8,6 +8,7 @@ import { PomodoroPage } from "../pages/pomodoro/PomodoroPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { KnowledgeGraphPage } from "../pages/graph/KnowledgeGraphPage";
 import { ChatPage } from "../pages/chat/ChatPage";
+import { WhiteboardPage } from "../pages/whiteboard/WhiteboardPage";
 import { RequireAuth } from "./RequireAuth";
 import { LoginPage } from "../pages/auth/LoginPage";
 import { RegisterPage } from "../pages/auth/RegisterPage";
@@ -36,6 +37,8 @@ export const router = createBrowserRouter([
           { path: "graph", element: <KnowledgeGraphPage /> },
           { path: "chat", element: <ChatPage /> },
           { path: "chat/:conversationId", element: <ChatPage /> },
+          { path: "whiteboard", element: <WhiteboardPage /> },
+          { path: "notes/:id/whiteboard", element: <WhiteboardPage /> },
           { path: "pomodoro", element: <PomodoroPage /> },
           { path: "settings", element: <SettingsPage /> },
         ],

@@ -26,6 +26,7 @@ import { useState } from "react";
 
 import HubIcon from "@mui/icons-material/HubRounded";
 import ChatIcon from "@mui/icons-material/ChatRounded";
+import DrawIcon from "@mui/icons-material/DrawRounded";
 
 const workspaceItems = [
   { label: "Dashboard", icon: <DashboardIcon />, to: "/" },
@@ -34,6 +35,7 @@ const workspaceItems = [
   { label: "Documents", icon: <DocumentIcon />, to: "/documents" },
   { label: "Knowledge Graph", icon: <HubIcon />, to: "/graph" },
   { label: "AI Chat", icon: <ChatIcon />, to: "/chat" },
+  { label: "Whiteboard", icon: <DrawIcon />, to: "/whiteboard" },
 ];
 
 const toolItems = [{ label: "Pomodoro & Tasks", icon: <PomodoroIcon />, to: "/pomodoro" }];
