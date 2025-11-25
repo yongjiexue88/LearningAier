@@ -14,6 +14,21 @@ class NoteService:
         self.llm_service = LLMService()
         self.vector_service = VectorService()
     
+    async def reindex_all_notes(self, user_id: str) -> dict:
+        """
+        Reindex all notes for a user.
+        """
+        notes_ref = self.db.collection("notes").where("user_id", "==", user_id)
+        count = 0
+        for note_doc in notes_ref.stream():
+            try:
+                await self.reindex_note(user_id, note_doc.id, force=True)
+                count += 1
+            except Exception as e:
+                print(f"Failed to reindex note {note_doc.id}: {e}")
+        
+        return {"success": True, "count": count}
+
     async def reindex_note(
         self,
         user_id: str,

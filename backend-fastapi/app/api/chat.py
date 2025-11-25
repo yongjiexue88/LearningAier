@@ -1,5 +1,6 @@
 """Chat API endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from typing import List
 from app.models.chat import (
     StartConversationRequest,
@@ -58,10 +59,8 @@ async def send_message(
 ):
     """
     Send a message in a conversation and get AI response.
-    
-    Uses RAG to retrieve relevant context from the conversation's scope
-    and generates a response using the LLM.
     """
+    # ... (existing code) ...
     # Get user's LLM model preference
     db = get_firestore_client()
     profile_doc = db.collection("profiles").document(user_id).get()
@@ -92,6 +91,42 @@ async def send_message(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send message: {str(e)}"
         )
+
+
+@router.post("/{conversation_id}/stream")
+async def stream_message(
+    conversation_id: str,
+    request: SendMessageRequest,
+    user_id: str = Depends(get_current_user_id),
+    chat_service: ChatService = Depends(get_chat_service)
+):
+    """
+    Stream a message in a conversation.
+    Returns SSE stream of text chunks.
+    """
+    # Get user's LLM model preference
+    db = get_firestore_client()
+    profile_doc = db.collection("profiles").document(user_id).get()
+    model_name = None
+    if profile_doc.exists:
+        profile_data = profile_doc.to_dict()
+        model_name = profile_data.get("llm_model")
+
+    async def event_generator():
+        try:
+            async for chunk in chat_service.stream_message(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=request.message,
+                model_name=model_name
+            ):
+                yield f"data: {chunk}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            print(f"[ChatAPI] Streaming error: {e}")
+            yield f"data: [ERROR] {str(e)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @router.get("/conversations", response_model=List[ConversationListItem])

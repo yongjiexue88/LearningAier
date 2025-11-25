@@ -1,5 +1,5 @@
 """Documents API routes"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from app.core.auth import verify_firebase_token, AuthenticatedUser
 from app.models.documents import UploadProcessRequest, UploadProcessResponse
 from app.services.document_service import DocumentService
@@ -11,29 +11,44 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 @router.post("/upload-process", response_model=UploadProcessResponse)
 async def upload_process(
     request: UploadProcessRequest,
+    background_tasks: BackgroundTasks,
     user: AuthenticatedUser = Depends(verify_firebase_token)
 ):
     """
     Process uploaded PDF document.
     
     Steps:
-    1. Download PDF from Cloud Storage
-    2. Extract text
-    3. Create draft note in Firestore
-    4. Chunk and embed content
-    5. Store embeddings in vector DB
+    1. Create placeholder note (sync)
+    2. Queue background task for processing (async)
     """
     try:
         doc_service = DocumentService()
         
-        result = await doc_service.process_upload(
+        # 1. Create placeholder note immediately
+        result = await doc_service.create_placeholder_note(
+            user_id=user.uid,
+            document_id=request.document_id
+        )
+        
+        note_id = result["note_id"]
+        
+        # 2. Queue background processing
+        background_tasks.add_task(
+            doc_service.process_upload_background,
             user_id=user.uid,
             document_id=request.document_id,
+            note_id=note_id,
             file_path=request.file_path,
             chunk_size=request.chunk_size
         )
         
-        return UploadProcessResponse(**result)
+        return UploadProcessResponse(
+            success=True,
+            document_id=request.document_id,
+            note_id=note_id,
+            chunks_created=-1,  # Indicates pending
+            text_preview="Processing document..."
+        )
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except UnauthorizedError as e:

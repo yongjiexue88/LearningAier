@@ -55,7 +55,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useAuth } from "../../providers/AuthProvider";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useStartConversation } from "../../hooks/useChat";
+import { useStartConversation, useStreamMessage, useConversation } from "../../hooks/useChat";
 import { sendMessage } from "../../services/api/chat";
 import { saveAs } from "file-saver";
 import {
@@ -325,6 +325,25 @@ export function NotesPage() {
   const processDocument = useProcessDocument();
   const generateFlashcards = useGenerateFlashcards();
   const startConversation = useStartConversation();
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const { sendMessageStream, streamingMessage, isStreaming, error: streamError } = useStreamMessage(currentConversationId ?? "");
+  const { data: conversationData } = useConversation(currentConversationId);
+
+  useEffect(() => {
+    if (conversationData) {
+      setChatMessages(conversationData.messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        citations: msg.sources?.map(s => ({
+          id: s.chunk_id,
+          note_id: s.note_id || "",
+          source_title: s.preview?.slice(0, 30) || "Source",
+          similarity: s.score,
+        }))
+      })));
+    }
+  }, [conversationData]);
 
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -335,7 +354,7 @@ export function NotesPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  // currentConversationId moved up
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [askAIScope, setAskAIScope] = useState<"note" | "folder" | "all">(
     "note"
@@ -787,7 +806,7 @@ export function NotesPage() {
       // Only trigger graph extraction and reindexing if content is not empty
       const hasContent = draft.content.trim().length > 0;
 
-      if (hasContent) {
+      if (hasContent && reason === "manual") {
         // Silently update knowledge graph
         extractGraph.mutate({
           text: draft.content,
@@ -1225,46 +1244,14 @@ export function NotesPage() {
         setCurrentConversationId(conversationResult.conversation_id);
 
         // Send the message in the new conversation
-        const response = await sendMessage(conversationResult.conversation_id, userMessageText);
-
-        // Add assistant response
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: response.answer,
-            citations: response.sources?.map((s) => ({
-              id: s.chunk_id,
-              note_id: s.note_id || "",
-              source_title: s.preview?.slice(0, 30) || "Source",
-              similarity: s.score,
-            })),
-          },
-        ]);
+        await sendMessageStream(userMessageText, conversationResult.conversation_id);
       } else {
         // Send message in existing conversation
-        const response = await sendMessage(currentConversationId, userMessageText);
-
-        // Add assistant response
-        setChatMessages((prev) => [
-          ...prev,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: response.answer,
-            citations: response.sources?.map((s) => ({
-              id: s.chunk_id,
-              note_id: s.note_id || "",
-              source_title: s.preview?.slice(0, 30) || "Source",
-              similarity: s.score,
-            })),
-          },
-        ]);
+        await sendMessageStream(userMessageText);
       }
-    } catch (error: any) {
-      console.error("Chat error:", error);
-      showSnackbar(error?.message ?? "Failed to send message", "error");
+    } catch (error) {
+      console.error("Failed to ask AI:", error);
+      showSnackbar("Failed to get response from AI", "error");
     } finally {
       setAskAILoading(false);
     }
@@ -2384,7 +2371,29 @@ export function NotesPage() {
                 )}
               </Box>
             ))}
-            {askAILoading && (
+            {isStreaming && (
+              <Box
+                sx={{
+                  alignSelf: "flex-start",
+                  bgcolor: alpha("#1e6ad4", 0.1),
+                  color: "text.primary",
+                  p: 1.5,
+                  borderRadius: 2,
+                  maxWidth: "90%",
+                }}
+              >
+                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                  {streamingMessage}
+                  <span style={{ display: 'inline-block', width: '8px', height: '15px', backgroundColor: 'currentColor', marginLeft: '4px', animation: 'blink 1s step-end infinite' }} />
+                </Typography>
+              </Box>
+            )}
+            {streamError && (
+              <Alert severity="error" sx={{ maxWidth: "90%" }}>
+                {streamError.message}
+              </Alert>
+            )}
+            {askAILoading && !isStreaming && (
               <Stack alignItems="center">
                 <CircularProgress size={20} />
               </Stack>

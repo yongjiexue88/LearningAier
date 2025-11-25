@@ -633,7 +633,7 @@ export function FlashcardsPage() {
               }
               }
               size="small"
-              fullWidth={{ xs: true, sm: false }}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
             >
               Refresh
             </Button>
@@ -643,7 +643,7 @@ export function FlashcardsPage() {
               onClick={handleGenerate}
               disabled={!selectedNoteId || generateMutation.isPending}
               size="small"
-              fullWidth={{ xs: true, sm: false }}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
             >
               {generateMutation.isPending ? "Generating..." : "Generate from note"}
             </Button>
@@ -668,7 +668,7 @@ export function FlashcardsPage() {
               }}
               disabled={!selectedNoteId || startConversation.isPending}
               size="small"
-              fullWidth={{ xs: true, sm: false }}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
             >
               {startConversation.isPending ? "Starting..." : "Chat about deck"}
             </Button>

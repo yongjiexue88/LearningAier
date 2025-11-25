@@ -39,6 +39,8 @@ credentials.Certificate = mock_certificate
 
 # Mock initialize_app and other firebase functions
 firebase_admin.initialize_app = MagicMock(return_value=MagicMock())
+firebase_admin.firestore = MagicMock()
+firebase_admin.firestore.client = MagicMock()
 
 # Now import the app
 from app.main import app

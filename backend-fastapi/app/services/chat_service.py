@@ -54,6 +54,145 @@ class ChatService:
         
         return conv_ref.id
     
+    async def stream_message(
+        self,
+        user_id: str,
+        conversation_id: str,
+        user_message: str,
+        model_name: Optional[str] = None
+    ):
+        """
+        Stream chat response using RAG.
+        Yields chunks of text.
+        """
+        # 1. Load conversation metadata
+        conv_ref = self.db.collection("users").document(user_id).collection("conversations").document(conversation_id)
+        conv_doc = conv_ref.get()
+        
+        if not conv_doc.exists:
+            raise ValueError(f"Conversation {conversation_id} not found")
+        
+        conv_data = conv_doc.to_dict()
+        scope = ChatScope(**conv_data["scope"])
+        
+        # 2. Retrieve recent message history
+        messages_ref = conv_ref.collection("messages")
+        recent_messages = (
+            messages_ref
+            .order_by("created_at", direction="DESCENDING")
+            .limit(6)
+            .stream()
+        )
+        
+        history = []
+        for msg_doc in recent_messages:
+            msg_data = msg_doc.to_dict()
+            history.append({
+                "role": msg_data["role"],
+                "content": msg_data["content"]
+            })
+        
+        history.reverse()
+        
+        # 3. Resolve scope and filter
+        filter_dict = {"user_id": user_id}
+        
+        if scope.type == "doc" and scope.ids:
+            if len(scope.ids) == 1:
+                filter_dict["note_id"] = scope.ids[0]
+        elif scope.type == "folder" and scope.ids:
+            note_ids = await self._resolve_folder_to_notes(user_id, scope.ids)
+            filter_dict["_folder_notes"] = note_ids
+        
+        # 4. Vector search
+        query_embedding = await self.llm_service.generate_query_embedding(user_message)
+        
+        pinecone_filter = {k: v for k, v in filter_dict.items() if not k.startswith("_")}
+        
+        matches = await self.vector_service.query_vectors(
+            query_vector=query_embedding,
+            top_k=8,
+            filter=pinecone_filter
+        )
+        
+        if scope.type == "folder" and "_folder_notes" in filter_dict:
+            folder_note_ids = set(filter_dict["_folder_notes"])
+            matches = [m for m in matches if m.metadata.get("note_id") in folder_note_ids]
+        
+        # 5. Build context
+        context_chunks = []
+        sources = []
+        
+        for i, match in enumerate(matches[:8]):
+            content = match.metadata.get("content", "")
+            context_chunks.append(f"[Source {i+1}] {content}")
+            sources.append(SourceChunk(
+                chunk_id=match.id,
+                note_id=match.metadata.get("note_id"),
+                doc_id=match.metadata.get("document_id"),
+                score=match.score,
+                preview=content[:250]
+            ))
+        
+        context = "\n\n".join(context_chunks)
+        
+        # 6. Build prompt
+        system_prompt = """You are a knowledgeable study tutor helping the student learn from their own materials.
+
+IMPORTANT GUIDELINES:
+- Answer questions based ONLY on the provided context from the student's notes and documents
+- If the context doesn't contain enough information to answer the question, say so honestly
+- Reference specific sources using [Source N] notation when making claims
+- Be clear, concise, and educational in your explanations
+"""
+        
+        llm_messages = [{"role": "system", "content": system_prompt}]
+        for hist_msg in history:
+            llm_messages.append(hist_msg)
+            
+        user_prompt = f"""Context from student's materials:
+{context}
+
+Student's question: {user_message}"""
+        
+        llm_messages.append({"role": "user", "content": user_prompt})
+        
+        # Prepare messages for LLM
+        simple_messages = [{"role": m["role"], "content": m["content"]} for m in llm_messages if m["role"] != "system"]
+        if simple_messages:
+            simple_messages[0]["content"] = system_prompt + "\n\n" + simple_messages[0]["content"]
+            
+        # 7. Stream response
+        full_answer = ""
+        async for chunk in self.llm_service.generate_chat_stream(
+            messages=simple_messages,
+            temperature=0.7,
+            max_tokens=2000,
+            model_name=model_name
+        ):
+            full_answer += chunk
+            yield chunk
+            
+        # 8. Save to Firestore (after stream completes)
+        now = datetime.utcnow().isoformat() + "Z"
+        
+        user_msg_ref = messages_ref.document()
+        user_msg_ref.set({
+            "role": "user",
+            "content": user_message,
+            "created_at": now,
+        })
+        
+        assistant_msg_ref = messages_ref.document()
+        assistant_msg_ref.set({
+            "role": "assistant",
+            "content": full_answer,
+            "created_at": now,
+            "sources": [s.model_dump() for s in sources] if sources else []
+        })
+        
+        conv_ref.update({"updated_at": now})
+
     async def send_message(
         self,
         user_id: str,

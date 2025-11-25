@@ -61,6 +61,10 @@ app.add_middleware(
 # Request/Response Logging Middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
+    # Skip logging for streaming endpoints to avoid consuming request body
+    if request.url.path.endswith("/stream"):
+        return await call_next(request)
+
     start_time = time.time()
     
     # Log request

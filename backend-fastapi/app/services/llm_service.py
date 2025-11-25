@@ -15,6 +15,47 @@ class LLMService:
             self.chat_model = genai.GenerativeModel(self.settings.llm_model)
             self.embedding_model = f"models/{self.settings.embeddings_model}"
     
+    async def generate_chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        model_name: Optional[str] = None
+    ):
+        """
+        Generate chat completion stream.
+        Yields chunks of text.
+        """
+        if self.settings.llm_provider == "gemini":
+            # Convert messages to Gemini format
+            prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+            
+            generation_config = {
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+            }
+            
+            # Use specific model if provided, otherwise default
+            model = self.chat_model
+            if model_name:
+                model = genai.GenerativeModel(model_name)
+
+            response = await model.generate_content_async(
+                prompt,
+                generation_config=generation_config,
+                stream=True
+            )
+            
+            async for chunk in response:
+                try:
+                    if chunk.text:
+                        yield chunk.text
+                except ValueError:
+                    # Handle safety blocks or other errors accessing .text
+                    continue
+        else:
+            raise NotImplementedError(f"Provider {self.settings.llm_provider} not implemented")
+
     async def generate_chat_completion(
         self,
         messages: List[Dict[str, str]],
