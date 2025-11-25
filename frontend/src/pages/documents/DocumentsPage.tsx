@@ -27,7 +27,7 @@ import { useStartConversation } from "../../hooks/useChat";
 import { useAuth } from "../../providers/AuthProvider";
 import { firebaseAuth, firebaseStorage, firebaseDb } from "../../lib/firebaseClient";
 import { ref, uploadBytesResumable } from "firebase/storage";
-import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, setDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";
@@ -42,6 +42,7 @@ interface DocumentRecord {
   note_id?: string;
   created_at: any;
   updated_at: any;
+  storage_path?: string;
 }
 
 export function DocumentsPage() {
@@ -150,12 +151,15 @@ export function DocumentsPage() {
       setUploadProgress(0);
 
       // 1. Create document metadata in Firestore first
-      const docRef = await addDoc(collection(firebaseDb, "documents"), {
+      const docRef = doc(collection(firebaseDb, "documents"));
+
+      await setDoc(docRef, {
         user_id: user.uid,
         title: selectedFile.name.replace(".pdf", ""),
         file_name: selectedFile.name,
         file_size: selectedFile.size,
         status: "uploading",
+        storage_path: `documents/${user.uid}/${docRef.id}/${selectedFile.name}`,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       });
@@ -529,13 +533,34 @@ export function DocumentsPage() {
                       </Typography>
                     )}
                   </Stack>
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => handleDeleteDocument(document.id)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
+                  <Stack direction="row" spacing={1}>
+                    {document.storage_path && (
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        title="Download PDF"
+                        onClick={async () => {
+                          try {
+                            const { getDownloadURL, ref } = await import("firebase/storage");
+                            const url = await getDownloadURL(ref(firebaseStorage, document.storage_path));
+                            window.open(url, "_blank");
+                          } catch (error) {
+                            console.error("Download error:", error);
+                            setErrorMessage("Failed to download file");
+                          }
+                        }}
+                      >
+                        <CloudUploadIcon sx={{ transform: "rotate(180deg)" }} />
+                      </IconButton>
+                    )}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeleteDocument(document.id)}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </Stack>
                 </CardActions>
               </Card>
             ))}

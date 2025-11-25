@@ -130,6 +130,13 @@ class DocumentService:
             
             await self.vector_service.upsert_vectors(vectors)
             
+            # 5. Update document status to completed
+            self.db.collection("documents").document(document_id).update({
+                "status": "completed",
+                "note_id": note_id,
+                "updated_at": SERVER_TIMESTAMP
+            })
+            
             print(f"✅ Successfully processed document {document_id} -> note {note_id}")
             
         except Exception as e:
@@ -139,6 +146,13 @@ class DocumentService:
                 self.db.collection("notes").document(note_id).update({
                     "content_md_zh": f"Error processing document: {str(e)}",
                     "is_processing": False
+                })
+                
+                # Update document status to error
+                self.db.collection("documents").document(document_id).update({
+                    "status": "error",
+                    "error_message": str(e),
+                    "updated_at": SERVER_TIMESTAMP
                 })
             except:
                 pass
