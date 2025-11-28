@@ -911,7 +911,8 @@ export function FlashcardsPage() {
                   size="small"
                   color="error"
                   startIcon={<DeleteIcon />}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.stopPropagation();
                     if (window.confirm(`Delete ${selectedIds.size} selected cards?`)) {
                       batchDeleteMutation.mutate(Array.from(selectedIds));
                     }
@@ -1000,6 +1001,7 @@ export function FlashcardsPage() {
                           color="error"
                           onClick={(event) => {
                             event.stopPropagation();
+                            event.preventDefault();
                             const confirmDelete = window.confirm("Delete this flashcard?");
                             if (confirmDelete) {
                               deleteFlashcardMutation.mutate(card.id);
