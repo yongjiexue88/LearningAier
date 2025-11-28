@@ -1,15 +1,77 @@
-import { firebaseAuth } from "./firebaseClient";
+import { firebaseAuth, firebaseDb } from "./firebaseClient";
+import { doc, getDoc } from "firebase/firestore";
 
 /**
  * Base API client with automatic auth token injection for FastAPI backend
+ * Supports dynamic environment switching between production and lab backends
  */
 class APIClient {
   private baseUrl: string;
+  private initialized = false;
 
   constructor() {
-    // Use /api instead of /functions/v1
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
-    this.baseUrl = baseUrl.replace(/\/$/, "");
+    // Initialize with default URL, will be updated after environment check
+    const defaultUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+    this.baseUrl = defaultUrl.replace(/\/$/, "");
+  }
+
+  /**
+   * Initialize and load user's preferred backend environment
+   * Called automatically on first request
+   */
+  private async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    try {
+      const user = firebaseAuth.currentUser;
+      if (!user) {
+        // Not logged in, use default
+        this.initialized = true;
+        return;
+      }
+
+      // Load user's environment preference from Firestore
+      const profileDoc = await getDoc(doc(firebaseDb, "profiles", user.uid));
+      const preferredEnv = profileDoc.exists()
+        ? (profileDoc.data().backend_environment as string | undefined)
+        : undefined;
+
+      // Set baseUrl based on preference
+      this.baseUrl = this.getEnvironmentUrl(preferredEnv);
+      this.initialized = true;
+    } catch (error) {
+      console.error("[apiClient] Failed to load environment preference:", error);
+      // Continue with default URL
+      this.initialized = true;
+    }
+  }
+
+  /**
+   * Get backend URL for a specific environment
+   */
+  private getEnvironmentUrl(environment?: string): string {
+    const prodUrl = import.meta.env.VITE_API_BASE_URL_PRODUCTION;
+    const labUrl = import.meta.env.VITE_API_BASE_URL_LAB;
+    const defaultUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+
+    if (environment === "lab" && labUrl) {
+      return labUrl.replace(/\/$/, "");
+    } else if (environment === "production" && prodUrl) {
+      return prodUrl.replace(/\/$/, "");
+    } else {
+      // If no preference or environment URLs not set, use default
+      return defaultUrl.replace(/\/$/, "");
+    }
+  }
+
+  /**
+   * Reload API client with latest environment preference
+   * Call this after user changes environment in settings
+   */
+  async reload(): Promise<void> {
+    this.initialized = false;
+    await this.initialize();
+    console.log(`[apiClient] Reloaded with baseUrl: ${this.baseUrl}`);
   }
 
   /**
@@ -32,6 +94,9 @@ class APIClient {
       requireAuth?: boolean;
     } = {}
   ): Promise<TResponse> {
+    // Ensure environment is loaded before making request
+    await this.initialize();
+
     const { method = "POST", body, requireAuth = true } = options;
     const startTime = performance.now();
 
