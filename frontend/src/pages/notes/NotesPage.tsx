@@ -208,6 +208,7 @@ interface NoteVersion {
 
 interface FlashcardRecord {
   id: string;
+  user_id?: string;
   set_id?: string | null;
   note_id?: string | null;
   document_id?: string | null;
@@ -1099,6 +1100,7 @@ export function NotesPage() {
         (data.flashcards ?? []).map((card) => ({
           ...card,
           id: crypto.randomUUID(),
+          user_id: userId!,
           set_id: null,
           note_id: selectedNoteId,
           document_id: null,
@@ -1148,13 +1150,16 @@ export function NotesPage() {
         const newDocRef = doc(flashcardsCol);
         const newCard: FlashcardRecord = {
           id: newDocRef.id,
+          user_id: userId!,
           note_id: selectedNoteId,
           document_id: null,
           term: card.term ?? null,
           definition: card.definition,
           context: card.context ?? null,
           category: card.category ?? "definition",
+          next_due_at: now,
           created_at: now,
+          updated_at: now,
         };
         batch.set(newDocRef, newCard);
         return newCard;

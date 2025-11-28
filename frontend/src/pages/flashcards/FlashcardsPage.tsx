@@ -21,7 +21,6 @@ import {
   Paper,
   Snackbar,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -168,7 +167,7 @@ export function FlashcardsPage() {
 
   const [selectedFolderId, setSelectedFolderId] = useState<string>("");
   const [selectedNoteId, setSelectedNoteId] = useState<string>("");
-  const [dueOnly, setDueOnly] = useState<boolean>(true);
+  const [dueOnly] = useState<boolean>(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [showAnswerFor, setShowAnswerFor] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState>({
@@ -616,14 +615,6 @@ export function FlashcardsPage() {
             </TextField>
           </Box>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ width: '100%' }}>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: { xs: '100%', sm: 'auto' } }}>
-              <Switch
-                checked={dueOnly}
-                onChange={(event) => setDueOnly(event.target.checked)}
-                inputProps={{ "aria-label": "Due today only" }}
-              />
-              <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>Due today only</Typography>
-            </Stack>
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -952,16 +943,12 @@ export function FlashcardsPage() {
                 </TableCell>
                 <TableCell>Term</TableCell>
                 <TableCell>Definition</TableCell>
-                <TableCell>Due</TableCell>
                 <TableCell>Context</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedFlashcards.map((card) => {
-                const dueLabel = card.next_due_at
-                  ? dayjs(card.next_due_at).fromNow()
-                  : "Due now";
                 const isSelected = selectedIds.has(card.id);
 
                 return (
@@ -991,17 +978,6 @@ export function FlashcardsPage() {
                       <Typography variant="body2" noWrap title={card.definition}>
                         {card.definition}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        size="small"
-                        color={
-                          !card.next_due_at || dayjs(card.next_due_at).isBefore(dayjs())
-                            ? "error"
-                            : "default"
-                        }
-                        label={dueLabel}
-                      />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" noWrap title={card.context ?? ""}>
@@ -1039,7 +1015,7 @@ export function FlashcardsPage() {
               })}
               {!filteredFlashcards.length ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={5}>
                     <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
                       No flashcards found. Try another filter or generate from a note.
                     </Typography>

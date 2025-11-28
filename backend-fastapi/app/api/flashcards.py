@@ -12,6 +12,20 @@ from app.core.exceptions import NotFoundError, UnauthorizedError
 router = APIRouter(prefix="/api/flashcards", tags=["flashcards"])
 
 
+@router.get("/", response_model=list[FlashcardItem])
+async def get_flashcards(
+    user: AuthenticatedUser = Depends(verify_firebase_token)
+):
+    """
+    Get all flashcards for the current user.
+    """
+    try:
+        flashcard_service = FlashcardService()
+        return await flashcard_service.get_all_flashcards(user.uid)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/generate", response_model=GenerateFlashcardsResponse)
 async def generate_flashcards(
     request: GenerateFlashcardsRequest,

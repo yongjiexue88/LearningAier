@@ -5,7 +5,8 @@ from app.models.notes import (
     AIQARequest, AIQAResponse, AIQASource,
     ReindexRequest, ReindexResponse,
     TranslateRequest, TranslateResponse,
-    TerminologyRequest, TerminologyResponse, TerminologyItem
+    TerminologyRequest, TerminologyResponse, TerminologyItem,
+    NoteItem
 )
 from app.services.rag_service import RAGService
 from app.services.note_service import NoteService
@@ -13,6 +14,20 @@ from app.services.user_service import UserService
 from app.core.exceptions import NotFoundError, UnauthorizedError
 
 router = APIRouter(prefix="/api/notes", tags=["notes"])
+
+
+@router.get("/", response_model=list[NoteItem])
+async def get_notes(
+    user: AuthenticatedUser = Depends(verify_firebase_token)
+):
+    """
+    Get all notes for the current user.
+    """
+    try:
+        note_service = NoteService()
+        return await note_service.get_all_notes(user.uid)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/ai-qa", response_model=AIQAResponse)

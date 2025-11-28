@@ -160,3 +160,15 @@ class FlashcardService:
             "interval": new_interval,
             "ease_factor": new_ease
         }
+
+    async def get_all_flashcards(self, user_id: str) -> list[dict]:
+        """
+        Get all flashcards for a user.
+        """
+        cards_ref = self.db.collection("flashcards").where("user_id", "==", user_id)
+        cards = []
+        for doc in cards_ref.stream():
+            card_data = doc.to_dict()
+            card_data["id"] = doc.id
+            cards.append(card_data)
+        return cards

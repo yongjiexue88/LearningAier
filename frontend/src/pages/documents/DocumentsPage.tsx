@@ -27,7 +27,7 @@ import { useStartConversation } from "../../hooks/useChat";
 import { useAuth } from "../../providers/AuthProvider";
 import { firebaseAuth, firebaseStorage, firebaseDb } from "../../lib/firebaseClient";
 import { ref, uploadBytesResumable } from "firebase/storage";
-import { collection, addDoc, setDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, setDoc, serverTimestamp, query, where, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { useProcessDocument } from "../../services/hooks/useDocuments";
 
 type UploadStatus = "idle" | "uploading" | "processing" | "success" | "error";

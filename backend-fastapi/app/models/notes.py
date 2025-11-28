@@ -65,3 +65,16 @@ class TerminologyItem(BaseModel):
 class TerminologyResponse(BaseModel):
     """Response model for terminology extraction"""
     terms: List[TerminologyItem]
+
+
+class NoteItem(BaseModel):
+    """Note item model"""
+    id: str
+    title: str
+    content_md_en: Optional[str] = None
+    content_md_zh: Optional[str] = None
+    user_id: str
+    folder_id: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"

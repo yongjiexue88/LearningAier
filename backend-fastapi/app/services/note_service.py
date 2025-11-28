@@ -198,3 +198,15 @@ class NoteService:
         # 4. Store in Firestore (optional, maybe in a subcollection or field)
         # For now just return them
         return terms
+
+    async def get_all_notes(self, user_id: str) -> list[dict]:
+        """
+        Get all notes for a user.
+        """
+        notes_ref = self.db.collection("notes").where("user_id", "==", user_id)
+        notes = []
+        for doc in notes_ref.stream():
+            note_data = doc.to_dict()
+            note_data["id"] = doc.id
+            notes.append(note_data)
+        return notes
