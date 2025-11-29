@@ -41,7 +41,36 @@ Prioritized action items based on comprehensive project review (2025-11-23).
 
 ---
 
-## �🔴 High Priority (Critical for Production)
+## 🚀 Phase 4: CI/CD & LLMOps Deployment
+
+### Manual Setup Required:
+
+- [ ] **Follow Cloud Build Setup**
+  - File: `CLOUD_BUILD_DEPLOY.md`
+  - Action: Enable APIs, create Artifact Registry, set up build triggers
+  - Effort: 30 minutes
+  - Impact: Automated deployments on every push
+
+- [ ] **Create GKE Cluster**
+  - File: `GKE_WORKER_ARCHITECTURE.md`
+  - Action: Create Autopilot cluster, configure Workload Identity, deploy worker
+  - Effort: 45 minutes
+  - Impact: Dedicated PDF processing service
+
+- [ ] **Set Up LLMOps Logging**
+  - File: `LLMOPS_GUIDE.md`
+  - Action: Create log-based metrics, set up BigQuery export (optional)
+  - Effort: 20 minutes
+  - Impact: Track prompt versions, token usage, costs
+
+- [ ] **Deploy and Test**
+  - Action: Push to main, verify Cloud Build triggers, test worker health, activate A/B experiment
+  - Effort: 1 hour
+  - Impact: Full Phase 4 infrastructure live
+
+---
+
+## 🔴 High Priority (Critical for Production)
 
 ### Security
 

@@ -473,7 +473,7 @@
             "parameters": {
               "display_name": {
                 "runtimeValue": {
-                  "constant": "flashcard-scheduler-endpoint"
+                  "constant": "flashcard-schedule-endpoint"
                 }
               },
               "location": {

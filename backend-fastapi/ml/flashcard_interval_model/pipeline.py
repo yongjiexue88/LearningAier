@@ -105,11 +105,11 @@ def flashcard_pipeline(
     )
     upload_task.after(train_task)
     
-    # 3. Create Endpoint
+    # 3. Create Endpoint (or use existing)
     endpoint_create_task = EndpointCreateOp(
         project=project_id,
         location=location,
-        display_name="flashcard-scheduler-endpoint",
+        display_name="flashcard-schedule-endpoint",  # Match existing endpoint name
     )
     endpoint_create_task.after(upload_task)
     

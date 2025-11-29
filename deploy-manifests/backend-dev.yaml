@@ -1,0 +1,54 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: learningaier-api-dev
+  labels:
+    app: learningaier-backend
+    environment: dev
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/cpu-boost: 'true'
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+        - image: us-central1-docker.pkg.dev/learningaier-lab/backend-images/learningaier-backend:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: APP_ENV
+              value: dev
+            - name: LLM_PROVIDER
+              value: vertex_ai
+            - name: VERTEX_PROJECT_ID
+              value: learningaier-lab
+            - name: VERTEX_LOCATION
+              value: us-central1
+            - name: VERTEX_GEMINI_MODEL
+              value: gemini-2.0-flash-exp
+            - name: VERTEX_EMBEDDING_MODEL
+              value: text-embedding-004
+            - name: LLM_MODEL
+              value: gemini-2.0-flash-exp
+            - name: EMBEDDINGS_PROVIDER
+              value: gemini
+            - name: EMBEDDINGS_MODEL
+              value: text-embedding-004
+            - name: EMBEDDINGS_DIMENSIONS
+              value: '768'
+            - name: VECTOR_DB_PROVIDER
+              value: pinecone
+            # Secrets should be managed via Secret Manager and injected
+            # For now, these will be set via gcloud deploy command
+          resources:
+            limits:
+              cpu: '2'
+              memory: 2Gi
+  traffic:
+    - percent: 100
+      latestRevision: true

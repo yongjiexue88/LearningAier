@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: document-worker
+  labels:
+    app: document-worker
+    component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: document-worker
+  template:
+    metadata:
+      labels:
+        app: document-worker
+        component: worker
+    spec:
+      serviceAccountName: document-worker-sa
+      containers:
+        - name: worker
+          image: us-central1-docker.pkg.dev/learningaier-lab/backend-images/document-worker:latest
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8000"
+            - name: VERTEX_PROJECT_ID
+              value: learningaier-lab
+            - name: VERTEX_LOCATION
+              value: us-central1
+            - name: VERTEX_GEMINI_MODEL
+              value: gemini-2.0-flash-exp
+            - name: VERTEX_EMBEDDING_MODEL
+              value: text-embedding-004
+            - name: LLM_PROVIDER
+              value: vertex_ai
+            - name: FIREBASE_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: project_id
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: document-worker-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: document-worker
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

@@ -5,9 +5,7 @@ import pandas as pd
 from google.cloud import bigquery
 from google.cloud import storage
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
 
@@ -24,34 +22,46 @@ def load_data(project_id, dataset_id, view_name):
 
 def preprocess_data(df):
     """Preprocess features and split data."""
-    feature_cols = ['card_category', 'note_length', 'response', 'current_interval', 'user_review_count_7d']
+    # Use exact column names from BigQuery view
+    feature_cols = [
+        'category',               # matches BigQuery
+        'word_count',            # matches BigQuery  
+        'rating',                # matches BigQuery
+        'review_sequence_number', # matches BigQuery
+        'days_since_last_review', # matches BigQuery
+        'user_avg_rating'        # matches BigQuery
+    ]
     target_col = 'label_next_interval_bucket'
     
-    X = df[feature_cols]
-    y = df[target_col]
+    X = df[feature_cols].copy()
+    y = df[target_col].copy()
     
-    numeric_features = ['note_length', 'response', 'current_interval', 'user_review_count_7d']
-    categorical_features = ['card_category']
+    # Encode categorical features (category column)
+    from sklearn.preprocessing import LabelEncoder
+    le_category = LabelEncoder()
+    X['category'] = le_category.fit_transform(X['category'].astype(str))
     
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ('num', StandardScaler(), numeric_features),
-            ('cat', OneHotEncoder(handle_unknown='ignore'), categorical_features)
-        ])
+    # Encode target
+    le_target = LabelEncoder()
+    y = le_target.fit_transform(y)
     
-    return X, y, preprocessor
+    return X, y, le_category, le_target
 
-def train_model(X_train, y_train, preprocessor):
-    """Train the model pipeline."""
-    clf = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('classifier', RandomForestClassifier(n_estimators=100, random_state=42))
-    ])
+def train_model(X_train, y_train):
+    """Train RandomForest model."""
+    model = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=10,
+        min_samples_split=5,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1
+    )
     
     print("⏳ Training model...")
-    clf.fit(X_train, y_train)
+    model.fit(X_train, y_train)
     print("✅ Model trained.")
-    return clf
+    return model
 
 def upload_to_gcs(local_path, gcs_path):
     """Upload local file to GCS."""
@@ -92,28 +102,33 @@ def main():
         return
 
     # 2. Preprocess
-    X, y, preprocessor = preprocess_data(df)
+    X, y, le_category, le_target = preprocess_data(df)
     
     # 3. Split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     # 4. Train
-    clf = train_model(X_train, y_train, preprocessor)
+    model = train_model(X_train, y_train)
     
     # 5. Evaluate
-    y_pred = clf.predict(X_test)
+    y_pred = model.predict(X_test)
     print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
     
-    # 6. Save & Upload
+    # 6. Save model and encoders
     local_model_path = "model.joblib"
-    joblib.dump(clf, local_model_path)
+    joblib.dump(model, local_model_path)
     
-    # Construct full GCS path for the file
-    # Vertex AI expects the directory, so we append filename if needed, 
-    # but usually we pass the directory as --model-dir.
-    # Standard convention: save as model.joblib in the directory.
+    # Also save the label encoders for prediction time
+    joblib.dump(le_category, "le_category.joblib")
+    joblib.dump(le_target, "le_target.joblib")
+    
+    # Upload all artifacts to GCS
     gcs_model_path = os.path.join(args.model_dir, "model.joblib")
     upload_to_gcs(local_model_path, gcs_model_path)
+    
+    # Upload encoders too
+    upload_to_gcs("le_category.joblib", os.path.join(args.model_dir, "le_category.joblib"))
+    upload_to_gcs("le_target.joblib", os.path.join(args.model_dir, "le_target.joblib"))
 
 if __name__ == "__main__":
     main()

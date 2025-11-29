@@ -1,0 +1,30 @@
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: learningaier-backend-pipeline
+description: Delivery pipeline for LearningAier backend service (dev → staging)
+serialPipeline:
+  stages:
+    - targetId: learningaier-backend-dev
+      profiles: []
+    - targetId: learningaier-backend-stg
+      profiles: []
+      strategy:
+        standard:
+          verify: false
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: learningaier-backend-dev
+description: Development environment (Cloud Run)
+run:
+  location: projects/learningaier-lab/locations/us-central1
+---
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: learningaier-backend-stg
+description: Staging environment (Cloud Run)
+run:
+  location: projects/learningaier-lab/locations/us-central1

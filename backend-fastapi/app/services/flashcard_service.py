@@ -3,6 +3,16 @@ from datetime import datetime, timedelta, timezone
 from app.core.firebase import get_firestore_client
 from app.services.llm_service import LLMService
 from app.core.exceptions import NotFoundError, UnauthorizedError
+from app.services.prompt_templates import get_prompt
+from app.services.llm_monitoring import LLMMonitor
+from app.services.ab_experiment import (
+    is_experiment_active,
+    assign_variant,
+    get_experiment_prompt,
+    log_experiment_event,
+    ExperimentEvent
+)
+import time
 
 
 class FlashcardService:
@@ -37,11 +47,76 @@ class FlashcardService:
                 "note_id": note_id
             }
         
-        # 3. Generate with LLM
+        # 3. A/B Test: Check if flashcard prompt experiment is active
+        template_name = "flashcard_generator_v2"  # Default
+        variant = None
+        
+        if is_experiment_active("flashcard_prompt_test"):
+            variant = assign_variant(user_id, "flashcard_prompt_test")
+            experiment_template = get_experiment_prompt("flashcard_prompt_test", variant)
+            if experiment_template:
+                template_name = experiment_template
+                log_experiment_event(
+                    user_id,
+                    "flashcard_prompt_test",
+                    variant,
+                    ExperimentEvent.ASSIGNMENT
+                )
+                print(f"[A/B] User {user_id} assigned variant {variant}, using {template_name}")
+        
+        # 4. Start monitoring
+        monitor = LLMMonitor(user_id=user_id)
+        start_time = time.time()
+        
+        # Get prompt with version
+        prompt_text, prompt_version = get_prompt(template_name, count=count, text=content)
+        
+        # Log request
+        monitor.log_prompt_request(
+            feature="flashcards",
+            prompt_template_name=template_name,
+            prompt_version=prompt_version,
+            model_name="gemini-2.0-flash-exp",
+            additional_data={
+                "note_id": note_id,
+                "flashcard_count": count,
+                "content_length": len(content),
+                "experiment_variant": variant
+            }
+        )
+        
+        # 5. Generate with LLM
         try:
             cards_data = await self.llm_service.generate_flashcards(content, count)
+            
+            # Log successful response
+            latency_ms = int((time.time() - start_time) * 1000)
+            monitor.start_time = start_time
+            monitor.log_prompt_response(
+                token_count=len(prompt_text.split()) + sum(len(str(card)) for card in cards_data),
+                success=True,
+                additional_data={
+                    "flashcards_generated": len(cards_data)
+                }
+            )
+            
+            # Log A/B experiment generation event
+            if variant:
+                log_experiment_event(
+                    user_id,
+                    "flashcard_prompt_test",
+                    variant,
+                    ExperimentEvent.GENERATION,
+                    {"flashcards_count": len(cards_data), "latency_ms": latency_ms}
+                )
+                
         except Exception as e:
             print(f"[ERROR] LLM generation failed: {e}")
+            # Log failed response
+            monitor.log_prompt_response(
+                success=False,
+                error=str(e)
+            )
             raise e
         
         # 4. Save to Firestore
