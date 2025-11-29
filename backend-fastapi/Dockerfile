@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # 5) Copy the app code
 COPY app ./app
+COPY scripts ./scripts
 
 # 6) For Cloud Run: listen on port 8080, 0.0.0.0
 ENV PORT=8080

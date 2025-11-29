@@ -153,6 +153,11 @@ def export_flashcards(db, bq_client, dataset_ref: str, user_id: Optional[str] = 
     rows = []
     for doc in query.stream():
         data = doc.to_dict()
+        
+        # Skip if user_id is missing (required field in BigQuery)
+        if not data.get("user_id"):
+            continue
+            
         row = {
             "id": doc.id,
             "user_id": data.get("user_id"),

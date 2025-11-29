@@ -36,10 +36,10 @@ def get_firebase_app():
             "token_uri": "https://oauth2.googleapis.com/token",
         })
     else:
-        raise ValueError(
-            "Firebase credentials not configured. Set FIREBASE_CREDENTIALS_JSON "
-            "or both FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY in .env.local"
-        )
+        # Fallback to Application Default Credentials (ADC)
+        # This works automatically on Cloud Run / GCE
+        print("⚠️ No explicit credentials found, using Application Default Credentials")
+        cred = credentials.ApplicationDefault()
     
     return firebase_admin.initialize_app(cred, {
         "storageBucket": settings.firebase_storage_bucket
