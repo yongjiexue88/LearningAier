@@ -22,10 +22,16 @@ class Settings(BaseSettings):
     firebase_private_key: Optional[str] = None
     
     # LLM
-    llm_provider: str = "gemini"
+    llm_provider: str = "google_ai"  # "google_ai" or "vertex_ai"
     llm_model: str = "gemini-2.0-flash-exp"
     llm_api_key: str
     llm_base_url: Optional[str] = None
+    
+    # Vertex AI (optional, used when llm_provider = "vertex_ai")
+    vertex_project_id: Optional[str] = None
+    vertex_location: str = "us-central1"
+    vertex_gemini_model: str = "gemini-2.0-flash-exp"
+    vertex_embedding_model: str = "text-embedding-004"
     
     # Embeddings
     embeddings_provider: str = "gemini"
@@ -40,9 +46,35 @@ class Settings(BaseSettings):
     pinecone_index_name: str = "learningaier-chunks"
     pinecone_index_host: Optional[str] = None  # Optional index host URL
     
-    class Config:
-        env_file = ".env.local"
-        env_file_encoding = "utf-8"
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        import os
+        from pydantic_settings import DotEnvSettingsSource
+        
+        # Determine which .env file to use based on ENV variable
+        env = os.getenv("ENV", "local")
+        env_file = f".env.{env}" if env != "local" else ".env.local"
+        
+        # Create a new DotEnvSettingsSource with the correct file
+        custom_dotenv = DotEnvSettingsSource(
+            settings_cls,
+            env_file=env_file,
+            env_file_encoding='utf-8'
+        )
+        
+        return (
+            init_settings,
+            env_settings,
+            custom_dotenv,
+            file_secret_settings,
+        )
 
     @field_validator("llm_api_key", "embeddings_api_key", "pinecone_api_key", mode="before")
     @classmethod

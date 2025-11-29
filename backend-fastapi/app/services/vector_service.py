@@ -52,7 +52,8 @@ class VectorService:
     
     async def upsert_vectors(
         self,
-        vectors: List[Dict[str, Any]]
+        vectors: List[Dict[str, Any]],
+        namespace: str = ""
     ):
         """
         Upsert vectors to the index.
@@ -60,15 +61,17 @@ class VectorService:
         Args:
             vectors: List of vector dicts with 'id', 'values', and 'metadata'
                 Example: [{"id": "chunk_1", "values": [...], "metadata": {"user_id": "..."}}]
+            namespace: Optional namespace for vector isolation (default: "" for main namespace)
         """
         if self.settings.vector_db_provider == "pinecone":
-            self.index.upsert(vectors=vectors, namespace="")
+            self.index.upsert(vectors=vectors, namespace=namespace)
     
     async def query_vectors(
         self,
         query_vector: List[float],
         top_k: int = 5,
-        filter: Optional[Dict[str, Any]] = None
+        filter: Optional[Dict[str, Any]] = None,
+        namespace: str = ""
     ) -> List[VectorMatch]:
         """
         Query similar vectors.
@@ -77,6 +80,7 @@ class VectorService:
             query_vector: Query embedding vector
             top_k: Number of results to return
             filter: Metadata filter dict, e.g. {"user_id": "abc", "note_id": "123"}
+            namespace: Optional namespace for vector isolation (default: "" for main namespace)
             
         Returns:
             List of VectorMatch objects
@@ -87,7 +91,7 @@ class VectorService:
                 top_k=top_k,
                 filter=filter,
                 include_metadata=True,
-                namespace=""
+                namespace=namespace
             )
             
             return [

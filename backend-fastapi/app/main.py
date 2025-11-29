@@ -24,7 +24,7 @@ app.include_router(chat.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Log startup information and initialize Firebase"""
+    """Log startup information and initialize Firebase + Vertex AI"""
     from app.core.firebase import get_firebase_app
     
     settings = get_settings()
@@ -45,6 +45,15 @@ async def startup_event():
     except Exception as e:
         print(f"❌ Firebase initialization failed: {e}")
         raise
+    
+    # Initialize Vertex AI if configured
+    if settings.llm_provider == "vertex_ai":
+        try:
+            from app.core.vertex import init_vertex_ai
+            init_vertex_ai()
+        except Exception as e:
+            print(f"❌ Vertex AI initialization failed: {e}")
+            raise
     
     print("="*80)
 

@@ -114,6 +114,68 @@ uvicorn app.main:app --reload --port 8080
 uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 4
 ```
 
+### Environment Switching
+
+The backend supports multiple environments with different configurations:
+
+#### **Production Environment (Google AI)**
+Uses `.env.local` configuration with Google AI (Gemini) as the LLM provider.
+
+```bash
+# Default - uses .env.local
+uvicorn app.main:app --reload --port 8080
+
+# Explicitly set
+ENV=local uvicorn app.main:app --reload --port 8080
+```
+
+**Configuration file:** `.env.local`
+```bash
+LLM_PROVIDER=google_ai  # or omit (defaults to google_ai)
+LLM_API_KEY=your-google-ai-key
+FIREBASE_PROJECT_ID=learningaier
+```
+
+#### **Lab Environment (Vertex AI)**
+Uses `.env.lab` configuration with Vertex AI as the LLM provider for testing.
+
+```bash
+ENV=lab uvicorn app.main:app --reload --port 8080
+```
+
+**Configuration file:** `.env.lab`
+```bash
+LLM_PROVIDER=vertex_ai
+VERTEX_PROJECT_ID=learningaier-lab
+VERTEX_LOCATION=us-central1
+VERTEX_GEMINI_MODEL=gemini-2.0-flash-exp
+VERTEX_EMBEDDING_MODEL=text-embedding-004
+FIREBASE_PROJECT_ID=learningaier  # Can use prod Firebase for data
+```
+
+**Startup logs will show the active provider:**
+```
+🚀 LearningAier API Starting Up
+📍 Environment: lab
+🤖 LLM Provider: vertex_ai  # or google_ai
+✅ Firebase Admin SDK initialized successfully
+✅ Vertex AI initialized (Project: learningaier-lab, Location: us-central1)
+```
+
+**Key Differences:**
+| Feature | Production (`.env.local`) | Lab (`.env.lab`) |
+|---------|---------------------------|------------------|
+| **LLM Provider** | Google AI (Gemini API) | Vertex AI |
+| **Authentication** | API Key | GCP Service Account (ADC) |
+| **Project** | `learningaier` | `learningaier-lab` |
+| **Cost** | Pay-per-call | Vertex AI pricing |
+| **Embeddings Namespace** | Default (`""`) | Lab-isolated (`{user_id}-vertex-lab`) |
+
+**Switching between environments:**
+- Stop the server (`Ctrl+C`)
+- Start with desired environment prefix
+- Check startup logs to confirm the provider
+
 The API will be available at:
 - API: http://localhost:8080
 - Interactive docs: http://localhost:8080/docs

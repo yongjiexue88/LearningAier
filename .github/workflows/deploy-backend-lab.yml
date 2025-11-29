@@ -77,9 +77,13 @@ jobs:
             --set-env-vars "FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" \
             --set-env-vars "FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" \
             --set-env-vars "FIREBASE_CREDENTIALS_JSON=${{ steps.secrets.outputs.FIREBASE_CREDENTIALS_BASE64 }}" \
-            --set-env-vars "LLM_PROVIDER=gemini" \
-            --set-env-vars "LLM_MODEL=gemini-2.0-flash-lite" \
+            --set-env-vars "LLM_PROVIDER=vertex_ai" \
+            --set-env-vars "LLM_MODEL=gemini-2.0-flash-exp" \
             --set-env-vars "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" \
+            --set-env-vars "VERTEX_PROJECT_ID=learningaier-lab" \
+            --set-env-vars "VERTEX_LOCATION=us-central1" \
+            --set-env-vars "VERTEX_GEMINI_MODEL=gemini-2.0-flash-exp" \
+            --set-env-vars "VERTEX_EMBEDDING_MODEL=text-embedding-004" \
             --set-env-vars "EMBEDDINGS_PROVIDER=gemini" \
             --set-env-vars "EMBEDDINGS_MODEL=text-embedding-004" \
             --set-env-vars "EMBEDDINGS_API_KEY=${{ secrets.LLM_API_KEY }}" \
@@ -89,3 +93,4 @@ jobs:
             --set-env-vars "PINECONE_INDEX_NAME=learningaier-index" \
             --set-env-vars "PINECONE_INDEX_HOST=${{ secrets.PINECONE_INDEX_HOST }}" \
             --set-env-vars "PINECONE_ENVIRONMENT=us-east-1"
+
