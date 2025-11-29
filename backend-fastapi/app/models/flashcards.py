@@ -44,6 +44,7 @@ class RecommendNextIntervalRequest(BaseModel):
     category: str = "General"
     word_count: int = 10
     review_sequence_number: int = 1
+    user_review_count_7d: int = 0
 
 
 class RecommendNextIntervalResponse(BaseModel):

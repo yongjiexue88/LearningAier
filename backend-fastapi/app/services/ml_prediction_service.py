@@ -37,18 +37,27 @@ class MLPredictionService:
             
         try:
             # Prepare instance for prediction
-            # The model expects a list of instances, where each instance is a list/dict of features
-            # Adjust this based on how the model was trained and what signature it expects
-            # For XGBoost/Sklearn in Vertex AI, it usually expects a list of feature values
-            
-            # Map features to the order expected by the model
+            # The model was trained with a DataFrame and ColumnTransformer using column names.
+            # We pass a dictionary which Vertex AI sklearn container converts to a DataFrame.
+            # Manual label encoding to match training (sorted unique values)
+            # Categories: code, concept, definition, vocabulary
+            category_map = {
+                "code": 0,
+                "concept": 1,
+                "definition": 2,
+                "vocabulary": 3,
+                "General": 3 # Default to vocabulary/general
+            }
+            cat_val = category_map.get(str(features.get('category', 'vocabulary')), 3)
+
+            # Create list of values in exact order of feature_cols in training script
             # ['category', 'word_count', 'rating', 'review_sequence_number', 'days_since_last_review', 'user_avg_rating']
             instance = [
-                str(features.get('category', 'General')),
+                cat_val,
                 int(features.get('word_count', 0)),
                 int(features.get('rating', 3)),
                 int(features.get('review_sequence_number', 1)),
-                int(features.get('days_since_last_review', 0)),
+                int(features.get('current_interval', 0)),
                 float(features.get('user_avg_rating', 3.0))
             ]
             
@@ -56,34 +65,34 @@ class MLPredictionService:
             prediction = endpoint.predict(instances=[instance])
             
             # Parse prediction result
-            # Assuming the model returns the bucket index or label
-            # We need to map the bucket back to days
-            # 0: '1_day', 1: '15_30_days', 2: '2_3_days', 3: '30_plus_days', 4: '4_7_days', 5: '8_14_days'
-            # This mapping depends on LabelEncoder order. 
-            # For a robust system, we should load the encoder or have a fixed mapping.
-            # For this lab, let's assume a simplified mapping or just return the raw value for now.
+            # Model returns buckets: 1, 2, 3, 4
+            predicted_bucket = int(prediction.predictions[0])
             
-            predicted_bucket_idx = int(prediction.predictions[0])
-            
-            # Approximate mapping based on alphabetical sort of labels:
-            # '1_day', '15_30_days', '2_3_days', '30_plus_days', '4_7_days', '8_14_days'
-            # 0 -> 1
-            # 1 -> 21 (avg of 15-30)
-            # 2 -> 3
-            # 3 -> 45 (30+)
-            # 4 -> 5
-            # 5 -> 10
-            
+            # Map bucket to days
+            # 1: 1 day
+            # 2: 2-3 days -> 2
+            # 3: 4-7 days -> 5
+            # 4: >7 days -> 14 (conservative estimate)
             mapping = {
-                0: 1,
-                1: 21,
-                2: 3,
-                3: 45,
-                4: 5,
-                5: 10
+                1: 1,
+                2: 2,
+                3: 5,
+                4: 14
             }
             
-            return mapping.get(predicted_bucket_idx, 1)
+            result = mapping.get(predicted_bucket, 1)
+            
+            # Log prediction for monitoring
+            log_payload = {
+                "event": "ml_prediction",
+                "features": instance,
+                "predicted_bucket": predicted_bucket,
+                "predicted_days": result,
+                "model_endpoint": self.endpoint_id
+            }
+            logger.info(f"ML Prediction: {log_payload}")
+            
+            return result
             
         except Exception as e:
             logger.error(f"ML prediction failed: {e}")

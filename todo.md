@@ -8,10 +8,10 @@ Prioritized action items based on comprehensive project review (2025-11-23).
 
 ### What Just Happened:
 - ✅ Authenticated with Google Cloud using Application Default Credentials
-- ✅ Submitted the pipeline job to Vertex AI
-- ✅ Pipeline is now running
+- ✅ Submitted the pipeline job to Vertex AI (Run 5)
+- ✅ Pipeline is now running (Fix: Save as .bst for XGBoost container)
 
-**Monitor Pipeline**: [View Progress](https://console.cloud.google.com/vertex-ai/pipelines/runs/flashcard-schedule-pipeline-20251129082759?project=learningaier-lab)
+**Monitor Pipeline**: [View Progress](https://console.cloud.google.com/vertex-ai/pipelines/runs/flashcard-schedule-pipeline-20251129135149?project=learningaier-lab)
 
 ⏱️ **Estimated completion**: 15-20 minutes from submission (check console)
 

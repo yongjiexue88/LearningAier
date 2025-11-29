@@ -91,7 +91,7 @@ export interface GenerateFlashcardsResponse {
 
 export interface ReviewFlashcardRequest {
     flashcard_id: string;
-    quality: number; // 0-5 SM-2 quality rating
+    rating: 1 | 2 | 3 | 4; // 1: Again, 2: Hard, 3: Good, 4: Easy
 }
 
 export interface ReviewFlashcardResponse {

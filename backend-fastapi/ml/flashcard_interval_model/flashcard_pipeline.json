@@ -1,0 +1,565 @@
+{
+  "components": {
+    "comp-custom-training-job": {
+      "executorLabel": "exec-custom-training-job",
+      "inputDefinitions": {
+        "parameters": {
+          "base_output_directory": {
+            "defaultValue": "",
+            "description": "The Cloud Storage location to store the output of this CustomJob or HyperparameterTuningJob. See [more information ](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/GcsDestination).",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "display_name": {
+            "description": "The name of the CustomJob.",
+            "parameterType": "STRING"
+          },
+          "enable_web_access": {
+            "defaultValue": false,
+            "description": "Whether you want Vertex AI to enable [interactive shell access ](https://cloud.google.com/vertex-ai/docs/training/monitor-debug-interactive-shell) to training containers. If `True`, you can access interactive shells at the URIs given by [CustomJob.web_access_uris][].",
+            "isOptional": true,
+            "parameterType": "BOOLEAN"
+          },
+          "encryption_spec_key_name": {
+            "defaultValue": "",
+            "description": "Customer-managed encryption key options for the CustomJob. If this is set, then all resources created by the CustomJob will be encrypted with the provided encryption key.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "labels": {
+            "defaultValue": {},
+            "description": "The labels with user-defined metadata to organize the CustomJob. See [more information](https://goo.gl/xmQnxf).",
+            "isOptional": true,
+            "parameterType": "STRUCT"
+          },
+          "location": {
+            "defaultValue": "{{$.pipeline_google_cloud_location}}",
+            "description": "Location for creating the custom training job. If not set, default to the location where the PipelineJob is run.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "max_wait_duration": {
+            "defaultValue": "86400s",
+            "description": "The maximum time to wait for the custom training job to be scheduled only if the scheduling strategy is set to FLEX_START. If set to 0, the job will wait indefinitely. The default is 24 hours. See [more information](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/CustomJobSpec#Strategy).",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "network": {
+            "defaultValue": "",
+            "description": "The full name of the Compute Engine network to which the job should be peered. For example, `projects/12345/global/networks/myVPC`. Format is of the form `projects/{project}/global/networks/{network}`. Where `{project}` is a project number, as in `12345`, and `{network}` is a network name. Private services access must already be configured for the network. If left unspecified, the job is not peered with any network.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "persistent_resource_id": {
+            "defaultValue": "{{$.pipeline_persistent_resource_id}}",
+            "description": "The ID of the PersistentResource in the same Project and Location which to run. The default value is a placeholder that will be resolved to the PipelineJob [RuntimeConfig](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/projects.locations.pipelineJobs#PipelineJob.RuntimeConfig)'s persistent resource id at runtime. However, if the PipelineJob doesn't set Persistent Resource as the job level runtime, the placedholder will be resolved to an empty string and the custom job will be run on demand. If the value is set explicitly, the custom job will runs in the specified persistent resource, in this case, please note the network and CMEK configs on the job should be consistent with those on the PersistentResource, otherwise, the job will be rejected.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "project": {
+            "defaultValue": "{{$.pipeline_google_cloud_project_id}}",
+            "description": "Project to create the custom training job in. Defaults to the project in which the PipelineJob is run.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "psc_interface_config": {
+            "defaultValue": {},
+            "description": "Configuration CustomJob with PSC-I. See [more information](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/CustomJobSpec#PscInterfaceConfig).",
+            "isOptional": true,
+            "parameterType": "STRUCT"
+          },
+          "reserved_ip_ranges": {
+            "defaultValue": [],
+            "description": "A list of names for the reserved IP ranges under the VPC network that can be used for this job. If set, we will deploy the job within the provided IP ranges. Otherwise, the job will be deployed to any IP ranges under the provided VPC network.",
+            "isOptional": true,
+            "parameterType": "LIST"
+          },
+          "restart_job_on_worker_restart": {
+            "defaultValue": false,
+            "description": "Restarts the entire CustomJob if a worker gets restarted. This feature can be used by distributed training jobs that are not resilient to workers leaving and joining a job.",
+            "isOptional": true,
+            "parameterType": "BOOLEAN"
+          },
+          "service_account": {
+            "defaultValue": "",
+            "description": "Sets the default service account for workload run-as account. The [service account ](https://cloud.google.com/vertex-ai/docs/pipelines/configure-project#service-account) running the pipeline submitting jobs must have act-as permission on this run-as account. If unspecified, the Vertex AI Custom Code [Service Agent ](https://cloud.google.com/vertex-ai/docs/general/access-control#service-agents) for the CustomJob's project.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "strategy": {
+            "defaultValue": "STANDARD",
+            "description": "The strategy to use for the custom training job. The default is 'STANDARD'. See [more information](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/CustomJobSpec#Strategy).",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "tensorboard": {
+            "defaultValue": "",
+            "description": "The name of a Vertex AI TensorBoard resource to which this CustomJob will upload TensorBoard logs.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "timeout": {
+            "defaultValue": "604800s",
+            "description": "The maximum job running time. The default is 7 days. A duration in seconds with up to nine fractional digits, terminated by 's', for example: \"3.5s\".",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "worker_pool_specs": {
+            "defaultValue": [],
+            "description": "Serialized json spec of the worker pools including machine type and Docker image. All worker pools except the first one are optional and can be skipped by providing an empty value. See [more information](https://cloud.google.com/vertex-ai/docs/reference/rest/v1/CustomJobSpec#WorkerPoolSpec).",
+            "isOptional": true,
+            "parameterType": "LIST"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "parameters": {
+          "gcp_resources": {
+            "description": "Serialized JSON of `gcp_resources` [proto](https://github.com/kubeflow/pipelines/tree/master/components/google-cloud/google_cloud_pipeline_components/proto) which tracks the CustomJob.",
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-deploy-model": {
+      "executorLabel": "exec-deploy-model",
+      "inputDefinitions": {
+        "artifacts": {
+          "endpoint": {
+            "artifactType": {
+              "schemaTitle": "system.Artifact",
+              "schemaVersion": "0.0.1"
+            }
+          },
+          "model": {
+            "artifactType": {
+              "schemaTitle": "system.Model",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        },
+        "parameters": {
+          "deployed_model_display_name": {
+            "parameterType": "STRING"
+          },
+          "location": {
+            "parameterType": "STRING"
+          },
+          "project_id": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-endpoint-create": {
+      "executorLabel": "exec-endpoint-create",
+      "inputDefinitions": {
+        "parameters": {
+          "description": {
+            "defaultValue": "",
+            "description": "The description of the Endpoint.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "display_name": {
+            "description": "The user-defined name of the Endpoint. The name can be up to 128 characters long and can be consist of any UTF-8 characters.",
+            "parameterType": "STRING"
+          },
+          "encryption_spec_key_name": {
+            "defaultValue": "",
+            "description": "Customer-managed encryption key spec for an Endpoint. If set, this Endpoint and all of this Endoint's sub-resources will be secured by this key. Has the form: `projects/my-project/locations/my-location/keyRings/my-kr/cryptoKeys/my-key`. The key needs to be in the same region as where the compute resource is created.  If set, this Endpoint and all sub-resources of this Endpoint will be secured by this key.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "labels": {
+            "defaultValue": {},
+            "description": "The labels with user-defined metadata to organize your Endpoints.  Label keys and values can be no longer than 64 characters (Unicode codepoints), can only contain lowercase letters, numeric characters, underscores and dashes. International characters are allowed.  See https://goo.gl/xmQnxf for more information and examples of labels.",
+            "isOptional": true,
+            "parameterType": "STRUCT"
+          },
+          "location": {
+            "defaultValue": "us-central1",
+            "description": "Location to create the Endpoint. If not set, default to us-central1.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "network": {
+            "defaultValue": "",
+            "description": "The full name of the Google Compute Engine network to which the Endpoint should be peered. Private services access must already be configured for the network. If left unspecified, the Endpoint is not peered with any network. [Format](https://cloud.google.com/compute/docs/reference/rest/v1/networks/insert): `projects/{project}/global/networks/{network}`. Where `{project}` is a project number, as in `'12345'`, and `{network}` is network name.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          },
+          "project": {
+            "defaultValue": "{{$.pipeline_google_cloud_project_id}}",
+            "description": "Project to create the Endpoint. Defaults to the project in which the PipelineJob is run.",
+            "isOptional": true,
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "endpoint": {
+            "artifactType": {
+              "schemaTitle": "google.VertexEndpoint",
+              "schemaVersion": "0.0.1"
+            },
+            "description": "Artifact tracking the created Endpoint."
+          }
+        },
+        "parameters": {
+          "gcp_resources": {
+            "description": "Serialized JSON of `gcp_resources` [proto](https://github.com/kubeflow/pipelines/tree/master/components/google-cloud/google_cloud_pipeline_components/proto) which tracks the create Endpoint's long-running operation.",
+            "parameterType": "STRING"
+          }
+        }
+      }
+    },
+    "comp-upload-model-v2": {
+      "executorLabel": "exec-upload-model-v2",
+      "inputDefinitions": {
+        "parameters": {
+          "artifact_uri": {
+            "parameterType": "STRING"
+          },
+          "display_name": {
+            "parameterType": "STRING"
+          },
+          "location": {
+            "parameterType": "STRING"
+          },
+          "project_id": {
+            "parameterType": "STRING"
+          },
+          "serving_container_image_uri": {
+            "parameterType": "STRING"
+          }
+        }
+      },
+      "outputDefinitions": {
+        "artifacts": {
+          "model": {
+            "artifactType": {
+              "schemaTitle": "system.Model",
+              "schemaVersion": "0.0.1"
+            }
+          }
+        },
+        "parameters": {
+          "Output": {
+            "parameterType": "STRING"
+          }
+        }
+      }
+    }
+  },
+  "deploymentSpec": {
+    "executors": {
+      "exec-custom-training-job": {
+        "container": {
+          "args": [
+            "--type",
+            "CustomJob",
+            "--payload",
+            "{\"display_name\": \"{{$.inputs.parameters['display_name']}}\", \"job_spec\": {\"worker_pool_specs\": {{$.inputs.parameters['worker_pool_specs']}}, \"scheduling\": {\"timeout\": \"{{$.inputs.parameters['timeout']}}\", \"restart_job_on_worker_restart\": {{$.inputs.parameters['restart_job_on_worker_restart']}}, \"strategy\": \"{{$.inputs.parameters['strategy']}}\", \"max_wait_duration\": \"{{$.inputs.parameters['max_wait_duration']}}\"}, \"service_account\": \"{{$.inputs.parameters['service_account']}}\", \"tensorboard\": \"{{$.inputs.parameters['tensorboard']}}\", \"enable_web_access\": {{$.inputs.parameters['enable_web_access']}}, \"network\": \"{{$.inputs.parameters['network']}}\", \"reserved_ip_ranges\": {{$.inputs.parameters['reserved_ip_ranges']}}, \"base_output_directory\": {\"output_uri_prefix\": \"{{$.inputs.parameters['base_output_directory']}}\"}, \"persistent_resource_id\": \"{{$.inputs.parameters['persistent_resource_id']}}\", \"psc_interface_config\": {{$.inputs.parameters['psc_interface_config']}}}, \"labels\": {{$.inputs.parameters['labels']}}, \"encryption_spec\": {\"kms_key_name\": \"{{$.inputs.parameters['encryption_spec_key_name']}}\"}}",
+            "--project",
+            "{{$.inputs.parameters['project']}}",
+            "--location",
+            "{{$.inputs.parameters['location']}}",
+            "--gcp_resources",
+            "{{$.outputs.parameters['gcp_resources'].output_file}}"
+          ],
+          "command": [
+            "python3",
+            "-u",
+            "-m",
+            "google_cloud_pipeline_components.container.v1.custom_job.launcher"
+          ],
+          "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:2.22.0"
+        }
+      },
+      "exec-deploy-model": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "deploy_model"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.15.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef deploy_model(\n    project_id: str,\n    location: str,\n    endpoint: dsl.Input[dsl.Artifact],\n    model: dsl.Input[dsl.Model],\n    deployed_model_display_name: str,\n):\n    from google.cloud import aiplatform\n    aiplatform.init(project=project_id, location=location)\n\n    # Extract resource names from artifacts\n    # VertexEndpoint artifact usually has resourceName in metadata\n    endpoint_name = endpoint.metadata[\"resourceName\"]\n    model_name = model.metadata[\"resourceName\"]\n\n    endpoint = aiplatform.Endpoint(endpoint_name=endpoint_name)\n    model_obj = aiplatform.Model(model_name=model_name)\n\n    endpoint.deploy(\n        model=model_obj,\n        deployed_model_display_name=deployed_model_display_name,\n        machine_type=\"n1-standard-2\",\n        min_replica_count=1,\n        max_replica_count=1,\n    )\n\n"
+          ],
+          "image": "python:3.11"
+        }
+      },
+      "exec-endpoint-create": {
+        "container": {
+          "args": [
+            "--type",
+            "CreateEndpoint",
+            "--payload",
+            "{\"Concat\": [\"{\", \"\\\"display_name\\\": \\\"\", \"{{$.inputs.parameters['display_name']}}\", \"\\\"\", \", \\\"description\\\": \\\"\", \"{{$.inputs.parameters['description']}}\", \"\\\"\", \", \\\"labels\\\": \", \"{{$.inputs.parameters['labels']}}\", \", \\\"encryption_spec\\\": {\\\"kms_key_name\\\":\\\"\", \"{{$.inputs.parameters['encryption_spec_key_name']}}\", \"\\\"}\", \", \\\"network\\\": \\\"\", \"{{$.inputs.parameters['network']}}\", \"\\\"\", \"}\"]}",
+            "--project",
+            "{{$.inputs.parameters['project']}}",
+            "--location",
+            "{{$.inputs.parameters['location']}}",
+            "--gcp_resources",
+            "{{$.outputs.parameters['gcp_resources'].output_file}}",
+            "--executor_input",
+            "{{$}}"
+          ],
+          "command": [
+            "python3",
+            "-u",
+            "-m",
+            "google_cloud_pipeline_components.container.v1.endpoint.create_endpoint.launcher"
+          ],
+          "image": "gcr.io/ml-pipeline/google-cloud-pipeline-components:2.22.0"
+        }
+      },
+      "exec-upload-model-v2": {
+        "container": {
+          "args": [
+            "--executor_input",
+            "{{$}}",
+            "--function_to_execute",
+            "upload_model_v2"
+          ],
+          "command": [
+            "sh",
+            "-c",
+            "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip || python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location 'google-cloud-aiplatform'  &&  python3 -m pip install --quiet --no-warn-script-location 'kfp==2.15.1' '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"$0\" \"$@\"\n",
+            "sh",
+            "-ec",
+            "program_path=$(mktemp -d)\n\nprintf \"%s\" \"$0\" > \"$program_path/ephemeral_component.py\"\n_KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         \"$program_path/ephemeral_component.py\"                         \"$@\"\n",
+            "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef upload_model_v2(\n    project_id: str,\n    location: str,\n    display_name: str,\n    serving_container_image_uri: str,\n    artifact_uri: str,\n    model: dsl.Output[dsl.Model], # Use generic Model, hoping it's compatible or we cast it\n) -> str:\n    from google.cloud import aiplatform\n    aiplatform.init(project=project_id, location=location)\n\n    uploaded_model = aiplatform.Model.upload(\n        display_name=display_name,\n        artifact_uri=artifact_uri,\n        serving_container_image_uri=serving_container_image_uri,\n    )\n\n    # Set metadata for the output artifact so downstream components recognize it\n    model.metadata[\"resourceName\"] = uploaded_model.resource_name\n    model.uri = f\"https://{location}-aiplatform.googleapis.com/v1/{uploaded_model.resource_name}\"\n\n    return uploaded_model.resource_name\n\n"
+          ],
+          "image": "python:3.11"
+        }
+      }
+    }
+  },
+  "pipelineInfo": {
+    "description": "Train and deploy flashcard interval prediction model",
+    "name": "flashcard-schedule-pipeline"
+  },
+  "root": {
+    "dag": {
+      "tasks": {
+        "custom-training-job": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-custom-training-job"
+          },
+          "inputs": {
+            "parameters": {
+              "base_output_directory": {
+                "componentInputParameter": "staging_bucket"
+              },
+              "display_name": {
+                "runtimeValue": {
+                  "constant": "flashcard-training-job"
+                }
+              },
+              "location": {
+                "componentInputParameter": "location"
+              },
+              "pipelinechannel--dataset_id": {
+                "componentInputParameter": "dataset_id"
+              },
+              "pipelinechannel--image_uri": {
+                "componentInputParameter": "image_uri"
+              },
+              "pipelinechannel--project_id": {
+                "componentInputParameter": "project_id"
+              },
+              "pipelinechannel--staging_bucket": {
+                "componentInputParameter": "staging_bucket"
+              },
+              "pipelinechannel--view_name": {
+                "componentInputParameter": "view_name"
+              },
+              "project": {
+                "componentInputParameter": "project_id"
+              },
+              "worker_pool_specs": {
+                "runtimeValue": {
+                  "constant": [
+                    {
+                      "container_spec": {
+                        "args": [
+                          "--project-id={{$.inputs.parameters['pipelinechannel--project_id']}}",
+                          "--dataset-id={{$.inputs.parameters['pipelinechannel--dataset_id']}}",
+                          "--view-name={{$.inputs.parameters['pipelinechannel--view_name']}}",
+                          "--model-dir={{$.inputs.parameters['pipelinechannel--staging_bucket']}}/model_output"
+                        ],
+                        "image_uri": "{{$.inputs.parameters['pipelinechannel--image_uri']}}"
+                      },
+                      "machine_spec": {
+                        "machine_type": "n1-standard-4"
+                      },
+                      "replica_count": 1.0
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "custom-training-job"
+          }
+        },
+        "deploy-model": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-deploy-model"
+          },
+          "dependentTasks": [
+            "endpoint-create",
+            "upload-model-v2"
+          ],
+          "inputs": {
+            "artifacts": {
+              "endpoint": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "endpoint",
+                  "producerTask": "endpoint-create"
+                }
+              },
+              "model": {
+                "taskOutputArtifact": {
+                  "outputArtifactKey": "model",
+                  "producerTask": "upload-model-v2"
+                }
+              }
+            },
+            "parameters": {
+              "deployed_model_display_name": {
+                "componentInputParameter": "model_display_name"
+              },
+              "location": {
+                "componentInputParameter": "location"
+              },
+              "project_id": {
+                "componentInputParameter": "project_id"
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "deploy-model"
+          }
+        },
+        "endpoint-create": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-endpoint-create"
+          },
+          "dependentTasks": [
+            "upload-model-v2"
+          ],
+          "inputs": {
+            "parameters": {
+              "display_name": {
+                "runtimeValue": {
+                  "constant": "flashcard-scheduler-endpoint"
+                }
+              },
+              "location": {
+                "componentInputParameter": "location"
+              },
+              "project": {
+                "componentInputParameter": "project_id"
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "endpoint-create"
+          }
+        },
+        "upload-model-v2": {
+          "cachingOptions": {
+            "enableCache": true
+          },
+          "componentRef": {
+            "name": "comp-upload-model-v2"
+          },
+          "dependentTasks": [
+            "custom-training-job"
+          ],
+          "inputs": {
+            "parameters": {
+              "artifact_uri": {
+                "runtimeValue": {
+                  "constant": "{{$.inputs.parameters['pipelinechannel--staging_bucket']}}/model_output"
+                }
+              },
+              "display_name": {
+                "componentInputParameter": "model_display_name"
+              },
+              "location": {
+                "componentInputParameter": "location"
+              },
+              "pipelinechannel--staging_bucket": {
+                "componentInputParameter": "staging_bucket"
+              },
+              "project_id": {
+                "componentInputParameter": "project_id"
+              },
+              "serving_container_image_uri": {
+                "runtimeValue": {
+                  "constant": "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest"
+                }
+              }
+            }
+          },
+          "taskInfo": {
+            "name": "upload-model-v2"
+          }
+        }
+      }
+    },
+    "inputDefinitions": {
+      "parameters": {
+        "dataset_id": {
+          "defaultValue": "learningaier_analytics",
+          "isOptional": true,
+          "parameterType": "STRING"
+        },
+        "image_uri": {
+          "parameterType": "STRING"
+        },
+        "location": {
+          "parameterType": "STRING"
+        },
+        "model_display_name": {
+          "parameterType": "STRING"
+        },
+        "project_id": {
+          "parameterType": "STRING"
+        },
+        "staging_bucket": {
+          "parameterType": "STRING"
+        },
+        "view_name": {
+          "defaultValue": "flashcard_training_view",
+          "isOptional": true,
+          "parameterType": "STRING"
+        }
+      }
+    }
+  },
+  "schemaVersion": "2.1.0",
+  "sdkVersion": "kfp-2.15.1"
+}

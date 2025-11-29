@@ -10,7 +10,7 @@ PROJECT_ID = "learningaier-lab"
 REGION = "us-central1"
 PIPELINE_ROOT = "gs://learningaier-lab-pipelines/root"
 PIPELINE_JSON = "flashcard_schedule_pipeline.json"
-DISPLAY_NAME = "flashcard-scheduler-run-1"
+DISPLAY_NAME = "flashcard-scheduler-run-5"
 
 # Dataset configuration
 DATASET_ID = "learningaier_analytics"
@@ -37,6 +37,10 @@ def submit_pipeline():
         pipeline_root=PIPELINE_ROOT,
         parameter_values={
             "project_id": PROJECT_ID,
+            "location": REGION,
+            "staging_bucket": PIPELINE_ROOT,
+            "image_uri": "gcr.io/learningaier-lab/flashcard-trainer:latest",
+            "model_display_name": "flashcard-scheduler-sklearn-model",
             "dataset_id": DATASET_ID,
             "view_name": VIEW_NAME
         }

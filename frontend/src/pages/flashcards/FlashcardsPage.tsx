@@ -178,7 +178,6 @@ export function FlashcardsPage() {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [showAnswerFor, setShowAnswerFor] = useState<string | null>(null);
   const [useMLScheduler, setUseMLScheduler] = useState<boolean>(false);
-  const [mlPrediction, setMlPrediction] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState>({
     open: false,
     message: "",
@@ -444,6 +443,8 @@ export function FlashcardsPage() {
   const reviewMutation = useReviewFlashcard();
 
   const handleReview = async (cardId: string, quality: number) => {
+    let predictionMsg: string | null = null;
+
     // If ML Scheduler is enabled, fetch prediction first
     if (useMLScheduler && activeCard) {
       try {
@@ -458,10 +459,8 @@ export function FlashcardsPage() {
 
         if (response) {
           const { ml_interval, sm2_interval } = response;
-          const msg = `📅 Next Review: SM-2 says ${sm2_interval}d` +
+          predictionMsg = `📅 Next Review: SM-2 says ${sm2_interval}d` +
             (ml_interval !== null ? `, ML says ${ml_interval}d` : ", ML unavailable");
-          setMlPrediction(msg);
-          // We'll show this in the snackbar after mutation success
         }
       } catch (error) {
         console.error("ML Prediction failed", error);
@@ -471,7 +470,7 @@ export function FlashcardsPage() {
     reviewMutation.mutate(
       {
         flashcard_id: cardId,
-        quality,
+        rating: quality as 1 | 2 | 3 | 4,
       },
       {
         onSuccess: () => {
@@ -479,9 +478,8 @@ export function FlashcardsPage() {
           queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
           queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
 
-          if (useMLScheduler && mlPrediction) {
-            showSnackbar(mlPrediction, "info");
-            setMlPrediction(null);
+          if (useMLScheduler && predictionMsg) {
+            showSnackbar(predictionMsg, "info");
           }
         },
         onError: (error: any) => {
@@ -843,7 +841,7 @@ export function FlashcardsPage() {
               disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
               onClick={() =>
                 activeCard &&
-                handleReview(activeCard.id, 0)
+                handleReview(activeCard.id, 1)
               }
             >
               Needs review
@@ -856,7 +854,7 @@ export function FlashcardsPage() {
               disabled={!activeCard || !activeAnswerShown || reviewMutation.isPending}
               onClick={() =>
                 activeCard &&
-                handleReview(activeCard.id, 5)
+                handleReview(activeCard.id, 4)
               }
             >
               I knew this

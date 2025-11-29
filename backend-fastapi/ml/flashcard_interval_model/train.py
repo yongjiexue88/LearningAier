@@ -7,7 +7,7 @@ import pandas as pd
 from google.cloud import bigquery
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 # Configure logging
@@ -59,19 +59,20 @@ def preprocess_data(df):
     return X, y, le_category, le_target
 
 def train_model(X, y):
-    """Train XGBoost classifier."""
+    """Train RandomForest classifier."""
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
-    model = XGBClassifier(
+    # Use RandomForestClassifier for sklearn serving container compatibility
+    model = RandomForestClassifier(
         n_estimators=100,
-        learning_rate=0.1,
-        max_depth=5,
+        max_depth=10,
+        min_samples_split=5,
+        min_samples_leaf=2,
         random_state=42,
-        use_label_encoder=False,
-        eval_metric='mlogloss'
+        n_jobs=-1  # Use all CPU cores
     )
     
-    logger.info("Training model...")
+    logger.info("Training RandomForest model...")
     model.fit(X_train, y_train)
     
     # Evaluate

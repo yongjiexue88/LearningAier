@@ -11,7 +11,7 @@ from google_cloud_pipeline_components.v1.model import ModelUploadOp
         "google-cloud-bigquery>=3.11.0",
         "pandas>=2.0.0",
         "scikit-learn>=1.3.0",
-        "xgboost>=2.0.0",
+        "xgboost==1.7.6",
         "db-dtypes>=1.2.0",
         "joblib>=1.3.0"
     ]
@@ -94,7 +94,7 @@ def train_flashcard_model(
     
     # Save artifacts
     os.makedirs(model_artifact.path, exist_ok=True)
-    joblib.dump(model, os.path.join(model_artifact.path, 'model.joblib'))
+    model.save_model(os.path.join(model_artifact.path, 'model.bst'))
     joblib.dump(le_category, os.path.join(model_artifact.path, 'le_category.joblib'))
     joblib.dump(le_target, os.path.join(model_artifact.path, 'le_target.joblib'))
     
@@ -177,7 +177,7 @@ def flashcard_pipeline(
     location: str = "us-central1",
     dataset_id: str = "learningaier_analytics",
     view_name: str = "flashcard_training_view",
-    serving_container_image_uri: str = "us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-0:latest"
+    serving_container_image_uri: str = "us-docker.pkg.dev/vertex-ai/prediction/xgboost-cpu.1-7:latest"
 ):
     # Train
     train_task = train_flashcard_model(
