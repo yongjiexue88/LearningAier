@@ -26,6 +26,11 @@ class APIClient {
       const user = firebaseAuth.currentUser;
       if (!user) {
         // Not logged in, use default
+        console.log(
+          "%c🌐 BACKEND ENVIRONMENT",
+          "background: #9E9E9E; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
+          `\n📍 Environment: Default (Not logged in)\n🔗 Base URL: ${this.baseUrl}`
+        );
         this.initialized = true;
         return;
       }
@@ -38,6 +43,16 @@ class APIClient {
 
       // Set baseUrl based on preference
       this.baseUrl = this.getEnvironmentUrl(preferredEnv);
+
+      // Log environment selection
+      console.log(
+        "%c🌐 BACKEND ENVIRONMENT",
+        preferredEnv === "lab"
+          ? "background: #FF9800; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
+          : "background: #4CAF50; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
+        `\n📍 Environment: ${preferredEnv === "lab" ? "LAB (Testing)" : "PRODUCTION (Stable)"}\n🔗 Base URL: ${this.baseUrl}`
+      );
+
       this.initialized = true;
     } catch (error) {
       console.error("[apiClient] Failed to load environment preference:", error);
@@ -71,7 +86,11 @@ class APIClient {
   async reload(): Promise<void> {
     this.initialized = false;
     await this.initialize();
-    console.log(`[apiClient] Reloaded with baseUrl: ${this.baseUrl}`);
+    console.log(
+      "%c🔄 ENVIRONMENT SWITCHED",
+      "background: #2196F3; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
+      `\n✅ API client reloaded successfully\n🔗 New Base URL: ${this.baseUrl}`
+    );
   }
 
   /**
@@ -115,12 +134,18 @@ class APIClient {
 
     const url = `${this.baseUrl}${endpoint}`;
 
+    // Determine current environment from baseUrl
+    const isLab = this.baseUrl.includes("lab");
+    const isProd = this.baseUrl.includes("learningaier-api") && !isLab;
+    const envLabel = isLab ? "LAB 🧪" : isProd ? "PROD ✓" : "LOCAL 💻";
+
     // Log request
     console.log(
       "%c🔵 API REQUEST",
       "background: #2196F3; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
     );
     console.group("Request Details");
+    console.log(`🌐 Environment: ${envLabel}`);
     console.log(`📍 ${method} ${url}`);
     if (body) {
       console.log("📦 Request Body:", body);
