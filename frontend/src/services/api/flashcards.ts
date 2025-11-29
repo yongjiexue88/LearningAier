@@ -4,6 +4,8 @@ import type {
     GenerateFlashcardsResponse,
     ReviewFlashcardRequest,
     ReviewFlashcardResponse,
+    RecommendNextIntervalRequest,
+    RecommendNextIntervalResponse,
 } from "./types";
 
 /**
@@ -28,6 +30,18 @@ export const flashcardsApi = {
     review: (request: ReviewFlashcardRequest) =>
         apiClient.request<ReviewFlashcardResponse, ReviewFlashcardRequest>(
             "/api/flashcards/review",
+            {
+                method: "POST",
+                body: request,
+            }
+        ),
+
+    /**
+     * Get recommended next interval from ML model
+     */
+    recommendNext: (request: RecommendNextIntervalRequest) =>
+        apiClient.request<RecommendNextIntervalResponse, RecommendNextIntervalRequest>(
+            "/api/flashcards/recommend-next",
             {
                 method: "POST",
                 body: request,

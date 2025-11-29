@@ -12,14 +12,14 @@ You have **two GitHub Actions workflows** for automated deployment:
 ### Production Workflow (`deploy-backend.yml`)
 - **Project:** `learningaier`
 - **Service:** `learningaier-api`
-- **LLM Provider:** Google AI (`LLM_PROVIDER=gemini`)
+- **LLM Provider:** Google AI (`LLM_PROVIDER=google_ai`)
 - **Triggers:** Push to `main` branch
 - **Secret:** `GCP_SA_KEY`
 
 ### Lab Workflow (`deploy-backend-lab.yml`)
 - **Project:** `learningaier-lab`
 - **Service:** `learningaier-api-lab` 
-- **LLM Provider:** Currently Google AI (line 80: `LLM_PROVIDER=gemini`)
+- **LLM Provider:** Vertex AI (`LLM_PROVIDER=vertex_ai`)
 - **Triggers:** Push to `main` branch OR manual trigger
 - **Secret:** `GCP_SA_KEY_LAB`
 
@@ -33,7 +33,7 @@ Edit `.github/workflows/deploy-backend-lab.yml` and change line 80:
 
 **FROM:**
 ```yaml
---set-env-vars "LLM_PROVIDER=gemini" \
+--set-env-vars "LLM_PROVIDER=google_ai" \
 ```
 
 **TO:**

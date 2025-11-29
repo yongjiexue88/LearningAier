@@ -101,6 +101,21 @@ export interface ReviewFlashcardResponse {
     ease_factor: number;
 }
 
+export interface RecommendNextIntervalRequest {
+    flashcard_id: string;
+    rating: 1 | 2 | 3 | 4;
+    current_interval: number;
+    category?: string;
+    word_count?: number;
+    review_sequence_number?: number;
+}
+
+export interface RecommendNextIntervalResponse {
+    ml_interval: number | null;
+    sm2_interval: number;
+    difference: number | null;
+}
+
 // Graph API types
 export interface ExtractGraphRequest {
     text: string;

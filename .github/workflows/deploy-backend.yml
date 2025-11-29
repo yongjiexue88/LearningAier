@@ -76,7 +76,7 @@ jobs:
             --set-env-vars "FIREBASE_PROJECT_ID=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" \
             --set-env-vars "FIREBASE_STORAGE_BUCKET=${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}" \
             --set-env-vars "FIREBASE_CREDENTIALS_JSON=${{ steps.secrets.outputs.FIREBASE_CREDENTIALS_BASE64 }}" \
-            --set-env-vars "LLM_PROVIDER=gemini" \
+            --set-env-vars "LLM_PROVIDER=google_ai" \
             --set-env-vars "LLM_MODEL=gemini-2.0-flash-lite" \
             --set-env-vars "LLM_API_KEY=${{ secrets.LLM_API_KEY }}" \
             --set-env-vars "EMBEDDINGS_PROVIDER=gemini" \

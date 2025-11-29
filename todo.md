@@ -4,7 +4,44 @@ Prioritized action items based on comprehensive project review (2025-11-23).
 
 ---
 
-## 🔴 High Priority (Critical for Production)
+## � ML Pipeline Deployment (In Progress)
+
+### What Just Happened:
+- ✅ Authenticated with Google Cloud using Application Default Credentials
+- ✅ Submitted the pipeline job to Vertex AI
+- ✅ Pipeline is now running
+
+**Monitor Pipeline**: [View Progress](https://console.cloud.google.com/vertex-ai/pipelines/runs/flashcard-schedule-pipeline-20251129082759?project=learningaier-lab)
+
+⏱️ **Estimated completion**: 15-20 minutes from submission (check console)
+
+### Next Steps (After Pipeline Completes):
+
+1. **Get Endpoint ID**:
+   - Go to [Vertex AI Endpoints](https://console.cloud.google.com/vertex-ai/endpoints?project=learningaier-lab)
+   - Find `flashcard-schedule-endpoint`
+   - Copy the numeric **Endpoint ID**
+
+2. **Configure Backend**:
+   ```bash
+   # Add to backend-fastapi/.env.lab:
+   FLASHCARD_MODEL_ENDPOINT_ID=your_copied_endpoint_id
+   ```
+
+3. **Restart Backend**:
+   ```bash
+   # Stop current server (Ctrl+C) and restart:
+   ENV=lab uvicorn app.main:app --reload --port 8080
+   ```
+
+4. **Test in UI**:
+   - Go to http://localhost:5173/flashcards
+   - Toggle "🧪 ML Scheduler" ON
+   - Review a card and you'll see ML vs SM-2 predictions!
+
+---
+
+## �🔴 High Priority (Critical for Production)
 
 ### Security
 

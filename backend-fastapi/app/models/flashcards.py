@@ -34,3 +34,20 @@ class ReviewFlashcardResponse(BaseModel):
     next_review: str  # ISO date string
     interval: int
     ease_factor: float
+
+
+class RecommendNextIntervalRequest(BaseModel):
+    """Request model for ML interval recommendation"""
+    flashcard_id: str
+    rating: Literal[1, 2, 3, 4]
+    current_interval: int
+    category: str = "General"
+    word_count: int = 10
+    review_sequence_number: int = 1
+
+
+class RecommendNextIntervalResponse(BaseModel):
+    """Response model for interval recommendation"""
+    ml_interval: Optional[int]
+    sm2_interval: int
+    difference: Optional[int]

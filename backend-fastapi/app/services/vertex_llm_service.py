@@ -143,24 +143,32 @@ class VertexLLMService:
         - A brief definition (in the same language as the text)
         
         Output JSON format:
-        [
-            {"term": "...", "definition": "..."}
-        ]
+        {
+            "terms": [
+                {"term": "...", "definition": "..."}
+            ]
+        }
         """
         
-        messages = [{"role": "user", "content": prompt + "\\n\\nText:\\n" + text}]
+        messages = [{"role": "user", "content": prompt + "\n\nText:\n" + text}]
         
-        # Define schema for structured output
+        # Define schema for structured output - root must be object
         schema = {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "term": {"type": "string"},
-                    "definition": {"type": "string"}
-                },
-                "required": ["term", "definition"]
-            }
+            "type": "object",
+            "properties": {
+                "terms": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "term": {"type": "string"},
+                            "definition": {"type": "string"}
+                        },
+                        "required": ["term", "definition"]
+                    }
+                }
+            },
+            "required": ["terms"]
         }
         
         response = await self.generate_chat_completion(
@@ -171,7 +179,8 @@ class VertexLLMService:
         
         import json
         try:
-            return json.loads(response)
+            result = json.loads(response)
+            return result.get("terms", [])
         except json.JSONDecodeError:
             return []
 
@@ -180,38 +189,39 @@ class VertexLLMService:
         Generate flashcards from text.
         Returns list of dicts with 'term', 'definition', 'context'.
         """
-        prompt = f"""Generate {count} flashcards based on the text.
+        prompt = f"""Generate exactly {count} flashcards based on the text.
         Focus on key concepts, definitions, and important details.
         
-        Output JSON format:
-        [
-            {{"term": "Concept or term", "definition": "Clear definition", "context": "Optional context or usage example"}}
-        ]
+        You must output valid JSON in this exact format:
+        {{
+            "flashcards": [
+                {{"term": "Concept or term", "definition": "Clear definition", "context": "Optional context or usage example"}}
+            ]
+        }}
+        
+        Text:
+        {text}
         """
         
-        messages = [{"role": "user", "content": prompt + "\\n\\nText:\\n" + text}]
+        messages = [{"role": "user", "content": prompt}]
         
-        schema = {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "term": {"type": "string"},
-                    "definition": {"type": "string"},
-                    "context": {"type": "string"}
-                },
-                "required": ["term", "definition"]
-            }
-        }
-        
+        # Use JSON mode without strict schema (more flexible)
         response = await self.generate_chat_completion(
             messages, 
-            response_format=schema,
+            temperature=0.7,
             model_name=model_name
         )
         
         import json
         try:
-            return json.loads(response)
+            # Try to parse the response as JSON
+            result = json.loads(response)
+            return result.get("flashcards", [])
         except json.JSONDecodeError:
+            # Fallback: try to extract JSON from markdown code blocks
+            import re
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group(1))
+                return result.get("flashcards", [])
             return []

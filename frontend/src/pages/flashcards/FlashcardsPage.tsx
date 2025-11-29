@@ -89,6 +89,8 @@ interface FlashcardRecord {
   context?: string | null;
   category: FlashcardCategory;
   next_due_at?: string | null;
+  interval?: number;
+  ease_factor?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -134,6 +136,8 @@ function mapFlashcardDoc(
     context: data.context,
     category: data.category,
     next_due_at: data.next_due_at instanceof Timestamp ? data.next_due_at.toDate().toISOString() : data.next_due_at,
+    interval: data.interval,
+    ease_factor: data.ease_factor,
     created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
     updated_at: data.updated_at instanceof Timestamp ? data.updated_at.toDate().toISOString() : data.updated_at,
   } as FlashcardRecord;
@@ -158,6 +162,9 @@ function isMissingIndexError(error: unknown): error is FirebaseError {
   return error instanceof FirebaseError && error.code === "failed-precondition";
 }
 
+import { flashcardsApi } from "../../services/api/flashcards";
+import { Switch, FormControlLabel } from "@mui/material";
+
 export function FlashcardsPage() {
   const { user } = useAuth();
   const userId = user?.uid ?? null;
@@ -170,6 +177,8 @@ export function FlashcardsPage() {
   const [dueOnly] = useState<boolean>(false);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [showAnswerFor, setShowAnswerFor] = useState<string | null>(null);
+  const [useMLScheduler, setUseMLScheduler] = useState<boolean>(false);
+  const [mlPrediction, setMlPrediction] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState>({
     open: false,
     message: "",
@@ -434,7 +443,31 @@ export function FlashcardsPage() {
   // Use new React Query hook for flashcard review
   const reviewMutation = useReviewFlashcard();
 
-  const handleReview = (cardId: string, quality: number) => {
+  const handleReview = async (cardId: string, quality: number) => {
+    // If ML Scheduler is enabled, fetch prediction first
+    if (useMLScheduler && activeCard) {
+      try {
+        const response = await flashcardsApi.recommendNext({
+          flashcard_id: cardId,
+          rating: quality as 1 | 2 | 3 | 4,
+          current_interval: activeCard.interval || 0,
+          category: activeCard.category,
+          word_count: 10, // Default or fetch from note if available
+          review_sequence_number: 1 // Default
+        });
+
+        if (response) {
+          const { ml_interval, sm2_interval } = response;
+          const msg = `📅 Next Review: SM-2 says ${sm2_interval}d` +
+            (ml_interval !== null ? `, ML says ${ml_interval}d` : ", ML unavailable");
+          setMlPrediction(msg);
+          // We'll show this in the snackbar after mutation success
+        }
+      } catch (error) {
+        console.error("ML Prediction failed", error);
+      }
+    }
+
     reviewMutation.mutate(
       {
         flashcard_id: cardId,
@@ -445,6 +478,11 @@ export function FlashcardsPage() {
           setShowAnswerFor(null);
           queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
           queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
+
+          if (useMLScheduler && mlPrediction) {
+            showSnackbar(mlPrediction, "info");
+            setMlPrediction(null);
+          }
         },
         onError: (error: any) => {
           showSnackbar(error?.message ?? "Review failed", "error");
@@ -732,7 +770,19 @@ export function FlashcardsPage() {
                     : "No cards due"}
                 </Typography>
               </Box>
-              <Chip label={`${filteredFlashcards.length} in view`} />
+              <Stack direction="row" spacing={2} alignItems="center">
+                <FormControlLabel
+                  control={
+                    <Switch
+                      size="small"
+                      checked={useMLScheduler}
+                      onChange={(e) => setUseMLScheduler(e.target.checked)}
+                    />
+                  }
+                  label={<Typography variant="caption">🧪 ML Scheduler</Typography>}
+                />
+                <Chip label={`${filteredFlashcards.length} in view`} />
+              </Stack>
             </Stack>
             {activeCard ? (
               <Stack spacing={1}>

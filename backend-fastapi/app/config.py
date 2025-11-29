@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     bigquery_project_id: Optional[str] = None  # Defaults to firebase_project_id if not set
     bigquery_dataset_id: str = "learningaier_analytics"
 
+    # ML Models
+    flashcard_model_endpoint_id: Optional[str] = None
+
     
     @classmethod
     def settings_customise_sources(
