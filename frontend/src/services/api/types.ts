@@ -184,3 +184,24 @@ export interface ConversationDetail {
     updated_at: string;
     messages: MessageItem[];
 }
+
+// Analytics API types
+export interface UserOverviewStats {
+    total_notes: number;
+    total_flashcards: number;
+    total_reviews: number;
+    avg_interval: number;
+    mastery_rate_percent: number;
+}
+
+export interface DailyReviewActivity {
+    review_date: string;  // YYYY-MM-DD format
+    review_count: number;
+    avg_rating: number;
+}
+
+export interface AnalyticsOverviewResponse {
+    overview: UserOverviewStats;
+    activity: DailyReviewActivity[];
+}
+

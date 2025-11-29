@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     pinecone_index_name: str = "learningaier-chunks"
     pinecone_index_host: Optional[str] = None  # Optional index host URL
     
+    # BigQuery
+    bigquery_project_id: Optional[str] = None  # Defaults to firebase_project_id if not set
+    bigquery_dataset_id: str = "learningaier_analytics"
+
+    
     @classmethod
     def settings_customise_sources(
         cls,

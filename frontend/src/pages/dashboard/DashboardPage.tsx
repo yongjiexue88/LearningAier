@@ -6,6 +6,7 @@ import {
   Typography,
   Button,
 } from "@mui/material";
+import { AnalyticsCard } from "../../components/AnalyticsCard";
 
 const quickActions = [
   { label: "New Note", description: "Start typing bilingual notes", path: "/notes" },
@@ -25,6 +26,9 @@ export function DashboardPage() {
           flashcards, and focus tools.
         </Typography>
       </Box>
+
+      {/* BigQuery Analytics Card */}
+      <AnalyticsCard />
 
       <Box
         sx={{

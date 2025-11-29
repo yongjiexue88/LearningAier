@@ -2,7 +2,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
-from app.api import notes, documents, flashcards, graph, chat
+from app.api import notes, documents, flashcards, graph, chat, analytics
 import time
 import json
 
@@ -21,6 +21,7 @@ app.include_router(documents.router)
 app.include_router(flashcards.router)
 app.include_router(graph.router)
 app.include_router(chat.router)
+app.include_router(analytics.router)
 
 @app.on_event("startup")
 async def startup_event():
