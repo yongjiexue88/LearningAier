@@ -5,12 +5,14 @@
 ## Features
 
 - 📝 **Bilingual Notes**: Create and manage notes in Chinese and English with Markdown support
-- 🤖 **AI Translation**: Automatic translation between Chinese and English using Google Gemini
-- 💬 **Chat with Your Notes**: RAG-powered Q&A over your note collection
-- 📄 **PDF Processing**: Upload PDFs, auto-extract text, and index for semantic search
-- 🎴 **Smart Flashcards**: AI-generated flashcards with spaced repetition review
+- 🤖 **AI Translation**: Automatic translation between Chinese and English using Google Gemini / Vertex AI
+- 💬 **Chat with Your Notes**: RAG-powered Q&A over your note collection with streaming responses
+- 📄 **PDF Processing**: Upload PDFs, auto-extract text via GKE worker, and index for semantic search
+- 🎴 **Smart Flashcards**: AI-generated flashcards with ML-powered spaced repetition scheduling
 - 🔍 **Semantic Search**: Vector-based similarity search powered by Pinecone
 - 📚 **Terminology Extraction**: Auto-extract bilingual technical terms from notes
+- 🧪 **LLMOps**: Prompt versioning, A/B testing, structured logging, and cost tracking
+- 📊 **Analytics**: BigQuery-powered insights into learning patterns and LLM usage
 
 ## Tech Stack
 
@@ -24,15 +26,20 @@
 ### Backend
 - FastAPI + Python 3.11
 - Firebase Admin SDK (Auth + Firestore + Cloud Storage)
-- Google Gemini API (LLM + Embeddings)
+- Google Gemini API / Vertex AI (LLM + Embeddings)
 - Pinecone Vector Database
+- XGBoost / RandomForest (ML Scheduler)
 - Deployed on Google Cloud Run
 
 ### Infrastructure
-- Firebase (Authentication, Firestore, Cloud Storage)
-- Google Cloud Run (Backend API)
-- GitHub Actions (CI/CD)
-- Docker (Backend containerization)
+- **Firebase**: Authentication, Firestore, Cloud Storage
+- **Google Cloud Run**: Backend API (serverless)
+- **GKE Autopilot**: Document Worker Service (PDF processing)
+- **Cloud Build**: CI for Docker images
+- **Cloud Deploy**: CD pipeline (dev → staging)
+- **Vertex AI**: LLM provider for lab environment
+- **BigQuery**: Analytics and LLMOps logging
+- **GitHub Actions**: CI/CD for frontend and legacy backend
 
 ## Quick Start
 
@@ -119,11 +126,20 @@ learningaier/
 
 ## Documentation
 
+### Architecture & Setup
 - **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, data flows, deployment guide
+- **[DEPLOYMENT_ENVIRONMENTS.md](backend-fastapi/DEPLOYMENT_ENVIRONMENTS.md)**: Multi-environment setup (local, lab, prod)
+- **[CLOUD_BUILD_DEPLOY.md](CLOUD_BUILD_DEPLOY.md)**: CI/CD with Cloud Build and Cloud Deploy
+- **[GKE_WORKER_ARCHITECTURE.md](GKE_WORKER_ARCHITECTURE.md)**: GKE Autopilot worker service setup
+
+### LLMOps & ML
+- **[LLMOPS_GUIDE.md](LLMOPS_GUIDE.md)**: Prompt versioning, monitoring, A/B testing
+- **[ML Pipeline Guide](backend-fastapi/ml/flashcard_interval_model/GUIDE.md)**: ML scheduler deployment on Vertex AI
+
+### Development
 - **[gemini.md](gemini.md)**: AI/Gemini usage patterns and optimization strategies
 - **[TODO.md](TODO.md)**: Prioritized improvement roadmap
 - **[Frontend API Guide](frontend/FRONTEND_API.md)**: API integration patterns
-- **[Migration Guide](frontend/MIGRATION_GUIDE.md)**: Node.js → FastAPI migration notes
 
 ## Deployment
 
