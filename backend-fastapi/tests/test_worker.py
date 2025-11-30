@@ -123,14 +123,15 @@ class TestWorkerHealthEndpoints:
         # Arrange
         client = TestClient(app)
         request_data = {
-            "user_id": "user_123",
             "document_id": "doc_123",
-            "note_id": "note_123",
-            "file_url": "gs://bucket/documents/test.pdf"
+            "file_path": "documents/test.pdf",
+            "user_id": "user_123",
+            "extract_text": True,
+            "generate_embeddings": False
         }
         
-        # Mock processor
-        with patch('worker.main.PDFProcessor') as mock_processor_class:
+        # Mock PDFProcessor where it's imported (inside the function)
+        with patch('worker.pdf_processor.PDFProcessor') as mock_processor_class:
             processor_instance = AsyncMock()
             processor_instance.process_document.return_value = {
                 "status": "success",
@@ -142,10 +143,10 @@ class TestWorkerHealthEndpoints:
             response = client.post("/process-pdf", json=request_data)
             
             # Assert
-            assert response.status_code == 200
+            assert response.status_code == 202  # Accepted
             data = response.json()
             assert data["status"] == "accepted"
-            assert data["document_id"] == "doc_123"
+            assert "task_id" in data
 
 
 class TestWorkerScaling:
