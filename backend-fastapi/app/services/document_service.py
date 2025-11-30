@@ -7,6 +7,7 @@ from app.core.exceptions import NotFoundError, UnauthorizedError
 from google.cloud.firestore import SERVER_TIMESTAMP
 import tempfile
 import os
+import httpx
 
 
 class DocumentService:
@@ -69,6 +70,62 @@ class DocumentService:
             "note_id": note_id,
             "title": note_data["title"]
         }
+
+    async def process_upload_via_worker(
+        self,
+        user_id: str,
+        document_id: str,
+        note_id: str,
+        file_path: str
+    ) -> None:
+        """
+        Offload PDF processing to the GKE worker service.
+        
+        Args:
+            user_id: User ID
+            document_id: Document ID from Firestore
+            note_id: Note ID created as placeholder
+            file_path: Path to the file in Cloud Storage (e.g., "documents/user123/file.pdf")
+        """
+        worker_url = os.getenv("WORKER_SERVICE_URL")
+        
+        if not worker_url:
+            print("⚠️  WORKER_SERVICE_URL not set, falling back to local processing")
+            return await self.process_upload_background(
+                user_id, document_id, note_id, file_path
+            )
+        
+        try:
+            # Construct the full GCS URL for the worker
+            file_url = f"gs://{self.bucket.name}/{file_path}"
+            
+            print(f"📤 Sending PDF to worker: {file_url}")
+            
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{worker_url}/process-pdf",
+                    json={
+                        "user_id": user_id,
+                        "document_id": document_id,
+                        "note_id": note_id,
+                        "file_url": file_url
+                    }
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    print(f"✅ Worker accepted task: {result}")
+                else:
+                    print(f"❌ Worker returned error {response.status_code}: {response.text}")
+                    raise Exception(f"Worker processing failed: {response.status_code}")
+                    
+        except Exception as e:
+            print(f"❌ Error calling worker service: {e}")
+            print("📥 Falling back to local processing")
+            # Fallback to local processing if worker fails
+            return await self.process_upload_background(
+                user_id, document_id, note_id, file_path
+            )
 
     async def process_upload_background(
         self,

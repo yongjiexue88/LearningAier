@@ -14,18 +14,17 @@ from enum import Enum
 # Experiment configuration
 EXPERIMENTS: Dict[str, Dict[str, Any]] = {
     "flashcard_prompt_test": {
-        "active": False,  # Set to True to activate experiment
-        "description": "Test flashcard_generator_v1 vs v2",
+        "active": True,  # Set to True to start experiment
+        "description": "Test flashcard_generator_v1 vs v2 for better quality",
         "variants": {
-            "A": "flashcard_generator_v1",
-            "B": "flashcard_generator_v2"
+            "A": "flashcard_generator_v1",  # Original prompt
+            "B": "flashcard_generator_v2"   # Improved prompt with clearer guidelines
         },
-        "traffic_split": 0.5,  # 50/50 split
-        "start_date": "2025-11-29",
+        "traffic_split": 0.5,  # 50% A, 50% B
         "metrics": [
-            "acceptance_rate",  # % of flashcards saved without edits
-            "edit_count",  # Number of edits made
-            "generation_latency"  # Time to generate
+            "acceptance_rate",   # How often users keep generated cards
+            "edit_rate",         # How often users edit cards
+            "latency"           # Response time
         ]
     },
     "qa_prompt_test": {

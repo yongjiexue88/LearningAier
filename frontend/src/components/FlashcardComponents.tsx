@@ -127,16 +127,16 @@ export function FlashcardReview({
     onReviewed,
 }: FlashcardReviewProps) {
     const [showAnswer, setShowAnswer] = useState(false);
-    const [quality, setQuality] = useState<number | null>(null);
+    const [rating, setRating] = useState<1 | 2 | 3 | 4 | null>(null);
     const reviewFlashcard = useReviewFlashcard();
 
     const handleReview = () => {
-        if (quality === null) return;
+        if (rating === null) return;
 
         reviewFlashcard.mutate(
             {
                 flashcard_id: flashcardId,
-                quality,
+                rating,
             },
             {
                 onSuccess: () => {
@@ -179,9 +179,9 @@ export function FlashcardReview({
                             How well did you know this?
                         </Typography>
                         <Rating
-                            value={quality}
-                            onChange={(_, value) => setQuality(value)}
-                            max={5}
+                            value={rating}
+                            onChange={(_, value) => setRating(value as 1 | 2 | 3 | 4 | null)}
+                            max={4}
                             size="large"
                             disabled={reviewFlashcard.isPending}
                         />
@@ -189,7 +189,7 @@ export function FlashcardReview({
                         <Button
                             variant="contained"
                             onClick={handleReview}
-                            disabled={reviewFlashcard.isPending || quality === null}
+                            disabled={reviewFlashcard.isPending || rating === null}
                             fullWidth
                             sx={{ mt: 2 }}
                         >

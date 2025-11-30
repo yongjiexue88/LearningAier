@@ -32,14 +32,13 @@ async def upload_process(
         
         note_id = result["note_id"]
         
-        # 2. Queue background processing
+        # 2. Queue background processing (via worker service)
         background_tasks.add_task(
-            doc_service.process_upload_background,
+            doc_service.process_upload_via_worker,
             user_id=user.uid,
             document_id=request.document_id,
             note_id=note_id,
-            file_path=request.file_path,
-            chunk_size=request.chunk_size
+            file_path=request.file_path
         )
         
         return UploadProcessResponse(
