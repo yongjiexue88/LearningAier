@@ -18,10 +18,12 @@ import {
     Stack,
     Rating,
     Paper,
+    Switch,
 } from "@mui/material";
 import {
     useGenerateFlashcards,
     useReviewFlashcard,
+    useRecommendNextInterval,
 } from "../services/hooks/useFlashcards";
 
 interface FlashcardGeneratorProps {
@@ -128,7 +130,41 @@ export function FlashcardReview({
 }: FlashcardReviewProps) {
     const [showAnswer, setShowAnswer] = useState(false);
     const [rating, setRating] = useState<1 | 2 | 3 | 4 | null>(null);
+    const [useML, setUseML] = useState(false);
+    const [recommendation, setRecommendation] = useState<{
+        ml: number | null;
+        sm2: number;
+        diff: number | null;
+    } | null>(null);
+
     const reviewFlashcard = useReviewFlashcard();
+    const recommendNext = useRecommendNextInterval();
+
+    const handleRatingChange = (newRating: 1 | 2 | 3 | 4 | null) => {
+        setRating(newRating);
+
+        if (newRating && useML) {
+            // Fetch recommendation when rating is selected and ML mode is on
+            recommendNext.mutate(
+                {
+                    flashcard_id: flashcardId,
+                    rating: newRating,
+                    current_interval: 0, // Ideally passed from props, defaulting to 0 for now
+                },
+                {
+                    onSuccess: (data) => {
+                        setRecommendation({
+                            ml: data.ml_interval,
+                            sm2: data.sm2_interval,
+                            diff: data.difference,
+                        });
+                    },
+                }
+            );
+        } else {
+            setRecommendation(null);
+        }
+    };
 
     const handleReview = () => {
         if (rating === null) return;
@@ -141,6 +177,9 @@ export function FlashcardReview({
             {
                 onSuccess: () => {
                     onReviewed?.();
+                    setRating(null);
+                    setShowAnswer(false);
+                    setRecommendation(null);
                 },
             }
         );
@@ -149,9 +188,21 @@ export function FlashcardReview({
     return (
         <Card>
             <CardContent>
-                <Typography variant="h6" gutterBottom>
-                    Flashcard Review
-                </Typography>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                    <Typography variant="h6">
+                        Flashcard Review
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Typography variant="caption" sx={{ mr: 1 }}>
+                            Use ML Schedule
+                        </Typography>
+                        <Switch
+                            checked={useML}
+                            onChange={(e) => setUseML(e.target.checked)}
+                            size="small"
+                        />
+                    </Box>
+                </Box>
 
                 <Paper sx={{ p: 3, mb: 2, minHeight: 100 }}>
                     <Typography variant="body1">{front}</Typography>
@@ -180,11 +231,41 @@ export function FlashcardReview({
                         </Typography>
                         <Rating
                             value={rating}
-                            onChange={(_, value) => setRating(value as 1 | 2 | 3 | 4 | null)}
+                            onChange={(_, value) => handleRatingChange(value as 1 | 2 | 3 | 4 | null)}
                             max={4}
                             size="large"
                             disabled={reviewFlashcard.isPending}
                         />
+
+                        {useML && recommendation && (
+                            <Alert severity="info" sx={{ mt: 2, mb: 1 }}>
+                                <Typography variant="subtitle2">Schedule Comparison:</Typography>
+                                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 1 }}>
+                                    <Box>
+                                        <Typography variant="caption" display="block">Standard (SM-2)</Typography>
+                                        <Typography variant="body2" fontWeight="bold">{recommendation.sm2} days</Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="caption" display="block">ML Model</Typography>
+                                        <Typography variant="body2" fontWeight="bold" color="primary">
+                                            {recommendation.ml ?? "N/A"} days
+                                        </Typography>
+                                    </Box>
+                                    {recommendation.diff !== null && (
+                                        <Box>
+                                            <Typography variant="caption" display="block">Difference</Typography>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight="bold"
+                                                color={recommendation.diff > 0 ? "success.main" : "error.main"}
+                                            >
+                                                {recommendation.diff > 0 ? "+" : ""}{recommendation.diff} days
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
+                            </Alert>
+                        )}
 
                         <Button
                             variant="contained"

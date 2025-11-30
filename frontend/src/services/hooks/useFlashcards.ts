@@ -42,3 +42,16 @@ export function useReviewFlashcard() {
         },
     });
 }
+
+/**
+ * Hook for getting ML-based interval recommendations
+ */
+export function useRecommendNextInterval() {
+    return useMutation({
+        mutationFn: (request: import("../api/types").RecommendNextIntervalRequest) =>
+            flashcardsApi.recommendNext(request),
+        onError: (error: Error) => {
+            console.error("Failed to get recommendation:", error.message);
+        },
+    });
+}

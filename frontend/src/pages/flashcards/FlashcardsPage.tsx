@@ -475,6 +475,7 @@ export function FlashcardsPage() {
       {
         onSuccess: () => {
           setShowAnswerFor(null);
+          setActiveCardId(null); // Reset active card to allow the next one to be picked
           queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
           queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
 
