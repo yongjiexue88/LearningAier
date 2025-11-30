@@ -52,6 +52,9 @@ class Settings(BaseSettings):
 
     # ML Models
     flashcard_model_endpoint_id: Optional[str] = None
+    
+    # Worker Service (GKE Autopilot)
+    worker_service_url: Optional[str] = None  # URL of document worker service
 
     
     @classmethod
