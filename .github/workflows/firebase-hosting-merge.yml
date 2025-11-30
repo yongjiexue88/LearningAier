@@ -22,6 +22,8 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL_LAB: ${{ secrets.VITE_API_BASE_URL_LAB }}
+          VITE_API_BASE_URL_PRODUCTION: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
         working-directory: frontend
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
