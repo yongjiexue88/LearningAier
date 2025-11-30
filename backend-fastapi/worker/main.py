@@ -1,11 +1,12 @@
 """Document worker main application"""
 import os
 import logging
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import asyncio
+from arq import create_pool
+from arq.connections import RedisSettings
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +21,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Redis configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+redis_settings = RedisSettings.from_dsn(REDIS_URL)
 
 class ProcessPDFRequest(BaseModel):
     """Request model for PDF processing"""
@@ -43,39 +47,45 @@ class HealthResponse(BaseModel):
     version: str
 
 
+@app.on_event("startup")
+async def startup():
+    app.state.redis = await create_pool(redis_settings)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await app.state.redis.close()
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint for Kubernetes probes"""
+    # Check Redis connection
+    try:
+        await app.state.redis.ping()
+        redis_status = "connected"
+    except Exception:
+        redis_status = "disconnected"
+
     return HealthResponse(
-        status="healthy",
+        status="healthy" if redis_status == "connected" else "degraded",
         service="document-worker",
         version="1.0.0"
     )
 
 
 @app.post("/process-pdf")
-async def process_pdf(request: ProcessPDFRequest, background_tasks: BackgroundTasks):
+async def process_pdf(request: ProcessPDFRequest):
     """
     Process a PDF document:
-    1. Download from Firebase Storage
-    2. Extract text
-    3. Generate embeddings (optional)
-    4. Save to Firestore/Pinecone
-    
-    Returns immediately with task_id, processes in background.
+    Enqueues a job in Redis for background processing.
     """
     try:
         logger.info(f"Received PDF processing request for document {request.document_id}")
         
-        # Import here to avoid circular dependencies
-        from worker.pdf_processor import PDFProcessor
-        
-        processor = PDFProcessor()
-        
-        # Schedule background processing
-        task_id = f"task_{request.document_id}"
-        background_tasks.add_task(
-            processor.process_document,
+        # Enqueue job in Redis
+        job = await app.state.redis.enqueue_job(
+            'process_document_task',
             document_id=request.document_id,
             file_path=request.file_path,
             user_id=request.user_id,
@@ -87,12 +97,12 @@ async def process_pdf(request: ProcessPDFRequest, background_tasks: BackgroundTa
             status_code=202,
             content={
                 "status": "accepted",
-                "task_id": task_id,
-                "message": f"Processing document {request.document_id} in background"
+                "task_id": job.job_id,
+                "message": f"Processing document {request.document_id} queued"
             }
         )
     except Exception as e:
-        logger.error(f"Error processing PDF request: {e}", exc_info=True)
+        logger.error(f"Error queuing PDF request: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

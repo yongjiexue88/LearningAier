@@ -21,6 +21,9 @@ class FlashcardService:
     def __init__(self):
         self.db = get_firestore_client()
         self.llm_service = LLMService()
+        # Import here to avoid circular dependency
+        from app.services.analytics_service import AnalyticsService
+        self.analytics_service = AnalyticsService()
     
     async def generate_flashcards(self, user_id: str, note_id: str, count: int = 5) -> dict:
         """
@@ -267,7 +270,7 @@ class FlashcardService:
         
         card_ref.update(update_data)
         
-        # 5. Log review history
+        # 5. Store review
         review_ref = self.db.collection("flashcard_reviews").document()
         review_ref.set({
             "flashcard_id": flashcard_id,
@@ -278,6 +281,9 @@ class FlashcardService:
             "ml_used": ml_used,
             "sm2_interval": sm2_interval  # Log SM-2 for comparison
         })
+        
+        # Invalidate analytics cache for this user
+        await self.analytics_service.invalidate_user_cache(user_id)
         
         # 6. Return result
         return {

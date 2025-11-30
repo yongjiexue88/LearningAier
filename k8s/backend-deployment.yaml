@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learningaier-backend
+  labels:
+    app: learningaier-backend
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: learningaier-backend
+  template:
+    metadata:
+      labels:
+        app: learningaier-backend
+        component: api
+    spec:
+      serviceAccountName: backend-sa
+      containers:
+        - name: backend
+          image: us-central1-docker.pkg.dev/learningaier-lab/backend-images/learningaier-backend:latest
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            # Environment
+            - name: APP_ENV
+              value: "lab"
+            - name: PORT
+              value: "8080"
+            
+            # Firebase
+            - name: FIREBASE_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: project_id
+            - name: FIREBASE_STORAGE_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-config
+                  key: storage_bucket
+            
+            # LLM Provider: Vertex AI
+            - name: LLM_PROVIDER
+              value: "vertex_ai"
+            - name: VERTEX_PROJECT_ID
+              value: "learningaier-lab"
+            - name: VERTEX_LOCATION
+              value: "us-central1"
+            - name: VERTEX_GEMINI_MODEL
+              value: "gemini-2.0-flash-exp"
+            - name: VERTEX_EMBEDDING_MODEL
+              value: "text-embedding-004"
+            
+            # Note: LLM_API_KEY not needed for Vertex AI with Workload Identity
+            - name: LLM_API_KEY
+              value: "not-needed-with-vertex"
+            - name: EMBEDDINGS_API_KEY
+              value: "not-needed-with-vertex"
+            
+            # Vector DB (Pinecone)
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pinecone-config
+                  key: api_key
+            - name: PINECONE_INDEX_NAME
+              value: "learningaier-index"
+            - name: PINECONE_INDEX_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: pinecone-config
+                  key: index_host
+            
+            # BigQuery
+            - name: BIGQUERY_PROJECT_ID
+              value: "learningaier-lab"
+            - name: BIGQUERY_DATASET_ID
+              value: "learningaier_analytics"
+            
+            # ML Models
+            - name: FLASHCARD_MODEL_ENDPOINT_ID
+              value: "3297434272188596224"
+            
+            # Worker Service (GKE internal)
+            - name: WORKER_SERVICE_URL
+              value: "http://document-worker:8000"
+            
+            # Redis Cache (GKE internal)
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+            - name: ENABLE_REDIS_CACHE
+              value: "true"
+          
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: learningaier-backend-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: learningaier-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# Service Account for Workload Identity
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-sa
+  annotations:
+    iam.gke.io/gcp-service-account: backend-sa@learningaier-lab.iam.gserviceaccount.com

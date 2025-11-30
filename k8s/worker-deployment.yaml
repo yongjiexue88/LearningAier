@@ -42,6 +42,8 @@ spec:
                 secretKeyRef:
                   name: firebase-config
                   key: project_id
+            - name: REDIS_URL
+              value: "redis://redis:6379"
           resources:
             requests:
               cpu: 500m

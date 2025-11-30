@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     # Worker Service (GKE Autopilot)
     worker_service_url: Optional[str] = None  # URL of document worker service
 
+    # Redis Cache & Rate Limiting
+    redis_url: str = "redis://localhost:6379"
+    enable_redis_cache: bool = True
+    
+    # Rate Limiting (requests per minute)
+    rate_limit_rag_chat: int = 20  # RAG/Chat endpoints
+    rate_limit_analytics: int = 30  # Analytics endpoints
+    rate_limit_document_upload: int = 10  # Document upload
     
     @classmethod
     def settings_customise_sources(
