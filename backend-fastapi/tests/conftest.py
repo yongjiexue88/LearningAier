@@ -4,6 +4,7 @@ Shared test fixtures for all test modules.
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock, AsyncMock, patch
+from dotenv import load_dotenv
 from app.main import app
 
 
@@ -13,18 +14,21 @@ def client():
     from app.core.auth import verify_firebase_token, AuthenticatedUser, security
     from fastapi.security import HTTPAuthorizationCredentials
     
-    # Override the verify_firebase_token dependency to return test user
-    async def override_verify_firebase_token(
-        credentials: HTTPAuthorizationCredentials = None  # Make it optional
-    ) -> AuthenticatedUser:
-        """Mock authenticated user that bypasses token verification"""
-        return AuthenticatedUser(
-            uid="test_user_123",
-            email="test@example.com"
-        )
+    # Override security scheme to return mock credentials
+    async def override_security():
+        mock_creds = MagicMock()
+        mock_creds.credentials = "mock_token_123"
+        return mock_creds
+
+    # Load test environment variables
+    load_dotenv(".env.test", override=True)
+    
+    # Clear settings cache to ensure new env vars are picked up
+    from app.config import get_settings
+    get_settings.cache_clear()
     
     # Apply dependency overrides
-    app.dependency_overrides[verify_firebase_token] = override_verify_firebase_token
+    app.dependency_overrides[security] = override_security
     
     # Create client
     test_client = TestClient(app)
@@ -42,21 +46,67 @@ def client():
 @pytest.fixture(autouse=True)
 def mock_firestore_global():
     """Automatically mock Firestore for ALL tests"""
-    with patch('app.core.firebase.get_firestore_client') as mock:
+    from app.core.firebase import get_firestore_client
+    get_firestore_client.cache_clear()
+    
+    # Patch get_firestore_client in all modules where it is imported
+    targets = [
+        'app.core.firebase.get_firestore_client',
+        'app.services.note_service.get_firestore_client',
+        'app.services.user_service.get_firestore_client',
+        'app.services.flashcard_service.get_firestore_client',
+        'app.services.document_service.get_firestore_client',
+        'app.api.chat.get_firestore_client',
+        'app.services.chat_service.get_firestore_client'
+    ]
+    
+    patches = [patch(t) for t in targets]
+    mocks = [p.start() for p in patches]
+    
+    try:
         mock_db = MagicMock()
+        
+        # Configure all mocks to return our mock_db
+        for m in mocks:
+            m.return_value = mock_db
         
         # Mock collection and document methods
         mock_collection = MagicMock()
-        mock_doc = MagicMock()
         mock_query = MagicMock()
         
         # Setup collection chain
         mock_db.collection.return_value = mock_collection
-        mock_collection.document.return_value = mock_doc
         mock_collection.where.return_value = mock_query
         mock_collection.order_by.return_value = mock_query
         mock_collection.limit.return_value = mock_query
         mock_collection.stream.return_value = []
+        
+        # Dynamic document creation to handle different IDs
+        def create_mock_document(doc_id="test_doc_123"):
+            mock_doc = MagicMock()
+            mock_doc.id = doc_id
+            
+            # Mock document snapshot
+            mock_snapshot = MagicMock()
+            mock_snapshot.exists = True
+            mock_snapshot.id = doc_id
+            mock_snapshot.to_dict.return_value = {
+                "user_id": "test_user_123",
+                "note_id": doc_id,
+                "title": "Test Note",
+                "content_md_zh": "测试内容",
+                "content_md_en": "Test content",
+                "created_at": "2025-01-01T00:00:00Z",
+                "updated_at": "2025-01-01T00:00:00Z",
+                "status": "processed"
+            }
+            mock_doc.get.return_value = mock_snapshot
+            mock_doc.set.return_value = None
+            mock_doc.update.return_value = None
+            mock_doc.delete.return_value = None
+            return mock_doc
+
+        mock_collection.document.side_effect = create_mock_document
         
         # Mock query methods
         mock_query.where.return_value = mock_query
@@ -65,39 +115,27 @@ def mock_firestore_global():
         mock_query.stream.return_value = []
         mock_query.get.return_value = []
         
-        # Mock document snapshot
-        mock_snapshot = MagicMock()
-        mock_snapshot.exists = True
-        mock_snapshot.id = "test_doc_123"
-        mock_snapshot.to_dict.return_value = {
-            "user_id": "test_user_123",
-            "title": "Test Note",
-            "content_md_zh": "测试内容",
-            "content_md_en": "Test content"
-        }
-        mock_doc.get.return_value = mock_snapshot
-        mock_doc.set.return_value = None
-        mock_doc.update.return_value = None
-        mock_doc.delete.return_value = None
-        
         # Mock batch operations
         mock_batch = MagicMock()
         mock_batch.commit.return_value = None
         mock_db.batch.return_value = mock_batch
         
-        mock.return_value = mock_db
         yield mock_db
+        
+    finally:
+        for p in patches:
+            p.stop()
 
 
 @pytest.fixture(autouse=True)
 def mock_firebase_auth_global():
     """Automatically mock Firebase Auth for ALL tests"""
-    with patch('app.core.auth.verify_firebase_token') as mock:
-        mock_user = MagicMock()
-        mock_user.uid = "test_user_123"
-        mock_user.email = "test@example.com"
-        mock.return_value = mock_user
-        yield mock
+    with patch('app.core.auth.auth') as mock_auth:
+        mock_auth.verify_id_token.return_value = {
+            "uid": "test_user_123",
+            "email": "test@example.com"
+        }
+        yield mock_auth
 
 
 @pytest.fixture(autouse=True)
@@ -116,17 +154,33 @@ def mock_firebase_storage_global():
 @pytest.fixture(autouse=True)
 def mock_llm_global():
     """Automatically mock LLM service for ALL tests"""
-    with patch('app.services.llm_service.LLMService') as mock_class:
+    targets = [
+        'app.services.llm_service.LLMService',
+        'app.services.flashcard_service.LLMService',
+        'app.services.note_service.LLMService',
+        'app.services.graph_service.LLMService',
+        'app.services.document_service.LLMService',
+        'app.services.rag_service.LLMService',
+        'app.services.chat_service.LLMService'
+    ]
+    
+    patches = [patch(t) for t in targets]
+    mocks = [p.start() for p in patches]
+    
+    try:
         service = AsyncMock()
         service.generate_text.return_value = "Generated AI response"
         service.generate_embeddings.return_value = [[0.1] * 768]
         service.generate_query_embedding.return_value = [0.1] * 768
+        service.generate_answer.return_value = "Test Answer"
         service.translate_text.return_value = "Translated text"
         service.extract_terminology.return_value = [
-            {"term": "Test Term", "definition": "Test Definition", "context": "Test context"}
+            {"term": "Test Term 1", "definition": "Test Definition 1", "context": "Test context 1"},
+            {"term": "Test Term 2", "definition": "Test Definition 2", "context": "Test context 2"}
         ]
         service.generate_flashcards.return_value = [
-            {"term": "AI", "definition": "Artificial Intelligence", "example": "ML is a subset of AI"}
+            {"term": "AI", "definition": "Artificial Intelligence", "example": "ML is a subset of AI"},
+            {"term": "ML", "definition": "Machine Learning", "example": "Deep Learning is a subset of ML"}
         ]
         service.generate_chat_completion.return_value = "This is an AI-generated answer."
         
@@ -137,30 +191,80 @@ def mock_llm_global():
             yield "streaming"
         service.generate_chat_stream.return_value = mock_stream()
         
-        mock_class.return_value = service
+        for m in mocks:
+            m.return_value = service
+            
         yield service
+        
+    finally:
+        for p in patches:
+            p.stop()
 
 
 @pytest.fixture(autouse=True)
 def mock_vector_db_global():
     """Automatically mock Vector DB (Pinecone) for ALL tests"""
-    with patch('app.services.vector_service.VectorService') as mock:
+    targets = [
+        'app.services.vector_service.VectorService',
+        'app.services.document_service.VectorService',
+        'app.services.note_service.VectorService',
+        'app.services.rag_service.VectorService',
+        'app.services.chat_service.VectorService'
+    ]
+    
+    patches = [patch(t) for t in targets]
+    mocks = [p.start() for p in patches]
+    
+    try:
         service = AsyncMock()
-        service.query_vectors.return_value = [
-            {
-                "id": "chunk_1",
-                "score": 0.95,
-                "metadata": {
-                    "content": "Test content chunk",
-                    "note_id": "note_123",
-                    "user_id": "test_user_123"
-                }
-            }
-        ]
+        
+        # Create a mock match object with attributes
+        mock_match = MagicMock()
+        mock_match.id = "chunk_1"
+        mock_match.score = 0.95
+        mock_match.metadata = {
+            "content": "Test content chunk",
+            "note_id": "note_123",
+            "user_id": "test_user_123",
+            "position": 0
+        }
+        
+        service.query_vectors.return_value = [mock_match]
         service.upsert_vectors.return_value = {"upserted_count": 1}
         service.delete_vectors.return_value = None
-        mock.return_value = service
+        
+        for m in mocks:
+            m.return_value = service
+            
         yield service
+        
+    finally:
+        for p in patches:
+            p.stop()
+
+
+@pytest.fixture(autouse=True)
+def mock_ml_prediction_global():
+    """Automatically mock ML Prediction Service for ALL tests"""
+    targets = [
+        'app.services.ml_prediction_service.MLPredictionService'
+    ]
+    
+    patches = [patch(t) for t in targets]
+    mocks = [p.start() for p in patches]
+    
+    try:
+        service = AsyncMock()
+        service.predict_next_interval.return_value = 12  # Match test expectation
+        
+        for m in mocks:
+            m.return_value = service
+            
+        yield service
+        
+    finally:
+        for p in patches:
+            p.stop()
 
 
 @pytest.fixture(autouse=True)
@@ -182,7 +286,7 @@ def mock_vertex_ai_global():
         endpoint = MagicMock()
         # Mock prediction response
         prediction = MagicMock()
-        prediction.predictions = [{"interval": 12, "confidence": 0.85}]
+        prediction.predictions = [4]  # Bucket 4 -> 14 days
         endpoint.predict.return_value = prediction
         mock_endpoint.return_value = endpoint
         yield endpoint

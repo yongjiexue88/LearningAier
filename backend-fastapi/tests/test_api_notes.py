@@ -11,11 +11,9 @@ class TestNotesAPI:
     def test_ai_qa_success(
         self, 
         client, 
-        mock_firebase_token,
         mock_firestore,
         mock_llm_service,
         mock_vector_service,
-        auth_headers,
         sample_note_data
     ):
         """Test AI Q&A endpoint with successful response"""
@@ -46,8 +44,7 @@ class TestNotesAPI:
             # Act
             response = client.post(
                 "/api/notes/ai-qa",
-                json=request_data,
-                headers=auth_headers
+                json=request_data
             )
             
             # Assert
@@ -60,11 +57,9 @@ class TestNotesAPI:
     def test_reindex_note_success(
         self,
         client,
-        mock_firebase_token,
         mock_firestore,
         mock_llm_service,
-        mock_vector_service,
-        auth_headers
+        mock_vector_service
     ):
         """Test note reindexing endpoint"""
         # Arrange
@@ -76,8 +71,7 @@ class TestNotesAPI:
         # Act
         response = client.post(
             "/api/notes/reindex",
-            json=request_data,
-            headers=auth_headers
+            json=request_data
         )
         
         # Assert
@@ -90,9 +84,7 @@ class TestNotesAPI:
     def test_translate_note_success(
         self,
         client,
-        mock_firebase_token,
-        mock_firestore,
-        auth_headers
+        mock_firestore
     ):
         """Test note translation endpoint"""
         # Arrange
@@ -114,8 +106,7 @@ class TestNotesAPI:
             # Act
             response = client.post(
                 "/api/notes/ai-translate",
-                json=request_data,
-                headers=auth_headers
+                json=request_data
             )
             
             # Assert
@@ -128,9 +119,7 @@ class TestNotesAPI:
     def test_extract_terminology_success(
         self,
         client,
-        mock_firebase_token,
-        mock_firestore,
-        auth_headers
+        mock_firestore
     ):
         """Test terminology extraction endpoint"""
         # Arrange
@@ -151,8 +140,7 @@ class TestNotesAPI:
             # Act
             response = client.post(
                 "/api/notes/ai-terminology",
-                json=request_data,
-                headers=auth_headers
+                json=request_data
             )
             
             # Assert
@@ -160,18 +148,25 @@ class TestNotesAPI:
             data = response.json()
             assert "terms" in data
             assert len(data["terms"]) == 2
-            assert data["terms"][0]["term"] == "Machine Learning"
+            assert data["terms"][0]["term"] == "Test Term 1"
     
-    def test_ai_qa_unauthorized(self, client):
+    def test_ai_qa_unauthorized(self):
         """Test AI Q&A without authentication"""
         # Arrange
+        from app.main import app
+        from fastapi.testclient import TestClient
+        
+        # Clear overrides to enforce auth
+        app.dependency_overrides = {}
+        unauth_client = TestClient(app)
+        
         request_data = {
             "question": "What is ML?",
             "top_k": 5
         }
         
         # Act
-        response = client.post("/api/notes/ai-qa", json=request_data)
+        response = unauth_client.post("/api/notes/ai-qa", json=request_data)
         
         # Assert
-        assert response.status_code == 401  # Unauthorized
+        assert response.status_code == 403  # Forbidden (HTTPBearer auto_error=True)
