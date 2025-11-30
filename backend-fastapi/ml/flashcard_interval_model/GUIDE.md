@@ -1,38 +1,97 @@
 # Flashcard Model MLOps Guide
 
-This guide explains how the Flashcard Interval Prediction model is trained, where data comes from, and how the model is deployed.
+This guide explains the end-to-end ML pipeline for the Flashcard Interval Prediction model.
 
-## 1. Data Collection Pipeline 📊
+## 1. Training Process 🧠
 
-The data flows from the application to the model in three steps:
+The model is trained on **Vertex AI** using a custom Docker container.
 
-1.  **User Action**: When a user reviews a flashcard, the app saves the review (rating, time, etc.) to **Firestore** in the `flashcard_reviews` collection.
-2.  **Sync to BigQuery**: A **Cloud Run Job** (`firestore-bq-sync`) runs nightly (e.g., 3 AM). It copies all new data from Firestore into **BigQuery**.
-3.  **Training View**: A SQL view `flashcard_training_view` in BigQuery automatically joins the raw reviews with note metadata to create the final "training dataset" (features + labels) whenever the training job runs.
+*   **Script**: `ml/flashcard_interval_model/train_cloud.py`
+*   **Container**: `gcr.io/learningaier-lab/flashcard-trainer:latest`
+*   **Trigger**: The pipeline is submitted via `ml/pipelines/submit_pipeline.py`.
 
-## 2. Training Process 🧠
+### How it works:
+1.  **Load Data**: The script queries BigQuery to get the training dataset.
+2.  **Preprocess**:
+    *   Encodes `category` using `LabelEncoder`.
+    *   Encodes target `label_next_interval_bucket` using `LabelEncoder`.
+3.  **Train**: Uses **RandomForestClassifier** (sklearn) to predict the best interval bucket.
+4.  **Save**: Saves `model.joblib`, `le_category.joblib`, and `le_target.joblib` to GCS.
 
-Training happens in the cloud on **Vertex AI** using a containerized workflow:
+## 2. Data Source 📊
 
-1.  **Pipeline Trigger**: You trigger the process by running `python3 run_pipeline.py`.
-2.  **Custom Job**: The pipeline launches a **Docker container** (using the image `gcr.io/learningaier-lab/flashcard-trainer`) on Google Cloud servers.
-3.  **Execution**: Inside the container, the `train_cloud.py` script executes the following steps:
-    *   **Loads Data**: Queries the `flashcard_training_view` from BigQuery to get the latest data.
-    *   **Preprocesses**: Converts text categories to numbers (OneHotEncoder) and scales numerical features (StandardScaler).
-    *   **Trains**: Fits a **RandomForestClassifier** (Scikit-Learn) to predict the optimal next review interval.
-    *   **Evaluates**: Checks the model's accuracy on a held-out test set.
+Data flows from the app to the model:
 
-## 3. Model Weights & Artifacts 💾
+1.  **Firestore**: Raw reviews are stored in `flashcard_reviews`.
+2.  **BigQuery**: Synced nightly via `firestore-bq-sync` job.
+3.  **Training View**: `learningaier_analytics.flashcard_training_view` joins reviews with note metadata.
 
-Once training is complete, the model (the "weights") is saved and stored:
+**Input Features (from BigQuery):**
+| Feature | Type | Description |
+| :--- | :--- | :--- |
+| `category` | String | Flashcard category (e.g., "vocabulary", "concept") |
+| `word_count` | Integer | Total words in term + definition |
+| `rating` | Integer | User rating (1=Again, 2=Hard, 3=Good, 4=Easy) |
+| `review_sequence_number` | Integer | How many times this card has been reviewed |
+| `days_since_last_review` | Integer | Actual days since the previous review |
+| `user_avg_rating` | Float | User's average rating across all cards |
 
-1.  **File Format**: The model pipeline is serialized into a file named `model.joblib`.
-2.  **Storage Location**: The script uploads this file to your **Google Cloud Storage (GCS)** bucket.
-    *   **Path**: `gs://learningaier-lab-ml-staging/model_output/model.joblib`
-3.  **Model Registry**: The pipeline "registers" this file with **Vertex AI Model Registry**, creating a versioned model resource.
-4.  **Serving**: This model resource is then deployed to a **Vertex AI Endpoint**, which the backend API calls to get predictions.
+## 3. Model Structure & Algorithm ⚙️
 
-## 4. Scheduling ⏰
+**Current Algorithm**: `RandomForestClassifier` (Scikit-Learn)
 
-*   **Current State**: The training process runs **manually** when you execute the `run_pipeline.py` script.
-*   **Automation**: To run this automatically (e.g., weekly), you can update `run_pipeline.py` to create a `PipelineJobSchedule` with a cron expression (e.g., `0 2 * * 0` for Sundays at 2 AM).
+**Where to change it**:
+*   Edit `ml/flashcard_interval_model/train_cloud.py`.
+*   Look for the `train_model` function:
+    ```python
+    model = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=10,
+        ...
+    )
+    ```
+*   **To update**: Change the classifier here (e.g., to `GradientBoostingClassifier`), rebuild the Docker container, and resubmit the pipeline.
+
+## 4. Input & Output 🔄
+
+### Model Input (Features)
+The model expects a dictionary of features matching the training data:
+```python
+{
+    "category": "vocabulary",
+    "word_count": 15,
+    "rating": 3,
+    "review_sequence_number": 2,
+    "current_interval": 1,      # Mapped to 'days_since_last_review'
+    "user_avg_rating": 3.5
+}
+```
+
+### Model Output (Prediction)
+The model predicts a **Bucket ID** (0, 1, 2, 3) which maps to a specific number of days.
+
+| Bucket ID | Label | Days |
+| :--- | :--- | :--- |
+| 0 | `1_day` | **1** |
+| 1 | `2_3_days` | **2** |
+| 2 | `4_7_days` | **5** |
+| 3 | `8_14_days` | **14** |
+
+## 5. API Mapping (Backend) 🔗
+
+The `MLPredictionService` (`app/services/ml_prediction_service.py`) handles the integration:
+
+1.  **Feature Extraction**:
+    *   Extracts `word_count` from the flashcard note.
+    *   Gets `user_avg_rating` from user stats.
+    *   Calculates `days_since_last_review`.
+2.  **Prediction**: Calls the Vertex AI Endpoint.
+3.  **Mapping**: Converts the predicted bucket ID back to days using the mapping table above.
+4.  **Fallback**: If ML fails or returns `None`, the system falls back to the standard **SM-2 algorithm**.
+
+### Flashcard API Structure
+When you call `POST /api/flashcards/{id}/review`:
+1.  The backend calculates the **SM-2 interval** (classic algorithm).
+2.  It asynchronously calls the **ML Model**.
+3.  If ML succeeds, it uses the **ML-predicted interval**.
+4.  The response includes the scheduled date based on this interval.

@@ -4,40 +4,10 @@ Prioritized action items based on comprehensive project review (2025-11-23).
 
 ---
 
-## � ML Pipeline Deployment (In Progress)
-
-### What Just Happened:
-- ✅ Authenticated with Google Cloud using Application Default Credentials
-- ✅ Submitted the pipeline job to Vertex AI (Run 5)
-- ✅ Pipeline is now running (Fix: Save as .bst for XGBoost container)
-
-**Monitor Pipeline**: [View Progress](https://console.cloud.google.com/vertex-ai/pipelines/runs/flashcard-schedule-pipeline-20251129135149?project=learningaier-lab)
-
-⏱️ **Estimated completion**: 15-20 minutes from submission (check console)
-
-### Next Steps (After Pipeline Completes):
-
-1. **Get Endpoint ID**:
-   - Go to [Vertex AI Endpoints](https://console.cloud.google.com/vertex-ai/endpoints?project=learningaier-lab)
-   - Find `flashcard-schedule-endpoint`
-   - Copy the numeric **Endpoint ID**
-
-2. **Configure Backend**:
-   ```bash
-   # Add to backend-fastapi/.env.lab:
-   FLASHCARD_MODEL_ENDPOINT_ID=your_copied_endpoint_id
-   ```
-
-3. **Restart Backend**:
-   ```bash
-   # Stop current server (Ctrl+C) and restart:
-   ENV=lab uvicorn app.main:app --reload --port 8080
-   ```
-
-4. **Test in UI**:
-   - Go to http://localhost:5173/flashcards
-   - Toggle "🧪 ML Scheduler" ON
-   - Review a card and you'll see ML vs SM-2 predictions!
+## ✅ ML Pipeline Deployment (Completed)
+- Successfully deployed RandomForest model to Vertex AI
+- Verified predictions and integration with backend
+- Updated documentation in `ml/flashcard_interval_model/GUIDE.md`
 
 ---
 
@@ -45,21 +15,21 @@ Prioritized action items based on comprehensive project review (2025-11-23).
 
 ### Manual Setup Required:
 
-- [ ] **Follow Cloud Build Setup**
+- [x] **Follow Cloud Build Setup**
   - File: `CLOUD_BUILD_DEPLOY.md`
-  - Action: Enable APIs, create Artifact Registry, set up build triggers
+  - Action: Enable APIs (Done), create Artifact Registry (Done), set up build triggers (Done)
   - Effort: 30 minutes
   - Impact: Automated deployments on every push
 
-- [ ] **Create GKE Cluster**
+- [x] **Create GKE Cluster**
   - File: `GKE_WORKER_ARCHITECTURE.md`
-  - Action: Create Autopilot cluster, configure Workload Identity, deploy worker
+  - Action: Create Autopilot cluster, configure Workload Identity, deploy worker (Done)
   - Effort: 45 minutes
   - Impact: Dedicated PDF processing service
 
-- [ ] **Set Up LLMOps Logging**
+- [x] **Set Up LLMOps Logging**
   - File: `LLMOPS_GUIDE.md`
-  - Action: Create log-based metrics, set up BigQuery export (optional)
+  - Action: Create log-based metrics (Done), set up BigQuery export (Optional)
   - Effort: 20 minutes
   - Impact: Track prompt versions, token usage, costs
 
@@ -163,7 +133,7 @@ Prioritized action items based on comprehensive project review (2025-11-23).
   - [ ] `POST /api/notes/ai-translate` (already implemented, needs testing)
   - [ ] `POST /api/notes/ai-terminology` (already implemented, needs testing)
   - [ ] `POST /api/flashcards/generate` (TODO in backend)
-  - [ ] `POST /api/flashcards/review` (TODO in backend)
+  - [x] `POST /api/flashcards/review` (Implemented with ML integration)
   - Effort: 2-3 hours per endpoint
   - Files: `backend-fastapi/app/api/flashcards.py`, `app/services/flashcard_service.py`
 
@@ -272,9 +242,12 @@ Prioritized action items based on comprehensive project review (2025-11-23).
   - Tools: Postman or frontend UI
   - Effort: 30 minutes
 
-- [ ] **Test Flashcard Generation and Review**
-  - Action: Generate flashcards from a note, test spaced repetition algorithm
-  - Effort: 30 minutes
+- [x] **Test Flashcard Review**
+  - Action: Verified ML model integration and SM-2 fallback
+  - Status: ✅ Working (ML predicts realistic intervals)
+
+- [ ] **Test Flashcard Generation**
+  - Action: Generate flashcards from a note
   - Note: Flashcard generation endpoint is TODO
 
 - [ ] **Verify Firebase Auth Token Handling**
