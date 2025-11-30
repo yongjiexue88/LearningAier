@@ -154,15 +154,15 @@ class VertexLLMService:
         
         # Define schema for structured output - root must be object
         schema = {
-            "type": "object",
+            "type": "OBJECT",
             "properties": {
                 "terms": {
-                    "type": "array",
+                    "type": "ARRAY",
                     "items": {
-                        "type": "object",
+                        "type": "OBJECT",
                         "properties": {
-                            "term": {"type": "string"},
-                            "definition": {"type": "string"}
+                            "term": {"type": "STRING"},
+                            "definition": {"type": "STRING"}
                         },
                         "required": ["term", "definition"]
                     }

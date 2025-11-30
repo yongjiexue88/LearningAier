@@ -36,27 +36,27 @@ class GraphService:
         messages = [{"role": "user", "content": prompt}]
 
         schema = {
-            "type": "object",
+            "type": "OBJECT",
             "properties": {
                 "nodes": {
-                    "type": "array",
+                    "type": "ARRAY",
                     "items": {
-                        "type": "object",
+                        "type": "OBJECT",
                         "properties": {
-                            "label": {"type": "string"},
-                            "type": {"type": "string"}
+                            "label": {"type": "STRING"},
+                            "type": {"type": "STRING"}
                         },
                         "required": ["label", "type"]
                     }
                 },
                 "edges": {
-                    "type": "array",
+                    "type": "ARRAY",
                     "items": {
-                        "type": "object",
+                        "type": "OBJECT",
                         "properties": {
-                            "from": {"type": "string"},
-                            "to": {"type": "string"},
-                            "relation": {"type": "string"}
+                            "from": {"type": "STRING"},
+                            "to": {"type": "STRING"},
+                            "relation": {"type": "STRING"}
                         },
                         "required": ["from", "to", "relation"]
                     }
