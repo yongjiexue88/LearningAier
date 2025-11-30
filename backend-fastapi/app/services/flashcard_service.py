@@ -279,8 +279,10 @@ class FlashcardService:
             "sm2_interval": sm2_interval  # Log SM-2 for comparison
         })
         
+        # 6. Return result
         return {
             "success": True,
+            "flashcard_id": flashcard_id,
             "next_review": next_review.isoformat(),
             "interval": new_interval,
             "ease_factor": new_ease

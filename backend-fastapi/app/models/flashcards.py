@@ -31,6 +31,7 @@ class ReviewFlashcardRequest(BaseModel):
 class ReviewFlashcardResponse(BaseModel):
     """Response model for review submission"""
     success: bool
+    flashcard_id: str  # Added to match frontend expectations
     next_review: str  # ISO date string
     interval: int
     ease_factor: float
