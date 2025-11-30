@@ -67,16 +67,24 @@ class APIClient {
   private getEnvironmentUrl(environment?: string): string {
     const prodUrl = import.meta.env.VITE_API_BASE_URL_PRODUCTION;
     const labUrl = import.meta.env.VITE_API_BASE_URL_LAB;
-    const defaultUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+    const localUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+
+    if (environment === "production" && prodUrl) {
+      return prodUrl.replace(/\/$/, "");
+    }
 
     if (environment === "lab" && labUrl) {
       return labUrl.replace(/\/$/, "");
-    } else if (environment === "production" && prodUrl) {
-      return prodUrl.replace(/\/$/, "");
-    } else {
-      // If no preference or environment URLs not set, use default
-      return defaultUrl.replace(/\/$/, "");
     }
+
+    if (environment === "local") {
+      return localUrl.replace(/\/$/, "");
+    }
+
+    // Fallback order: production, lab, then local/default
+    if (prodUrl) return prodUrl.replace(/\/$/, "");
+    if (labUrl) return labUrl.replace(/\/$/, "");
+    return localUrl.replace(/\/$/, "");
   }
 
   /**
@@ -137,7 +145,8 @@ class APIClient {
     // Determine current environment from baseUrl
     const isLab = this.baseUrl.includes("lab");
     const isProd = this.baseUrl.includes("learningaier-api") && !isLab;
-    const envLabel = isLab ? "LAB 🧪" : isProd ? "PROD ✓" : "LOCAL 💻";
+    const isLocal = this.baseUrl.includes("localhost") || this.baseUrl.includes("127.0.0.1");
+    const envLabel = isLab ? "LAB 🧪" : isProd ? "PROD ✓" : isLocal ? "LOCAL 💻" : "CUSTOM 🌐";
 
     // Log request
     console.log(
@@ -264,6 +273,5 @@ class APIClient {
 }
 
 export const apiClient = new APIClient();
-
 
 

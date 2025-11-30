@@ -19,11 +19,13 @@ import { useAuth } from "../../providers/AuthProvider";
 import { apiClient } from "../../lib/apiClient";
 
 export function SettingsPage() {
+  type BackendEnvironment = "production" | "lab" | "local";
+
   const { user } = useAuth();
   const [provider, setProvider] = useState("gemini");
   const [model, setModel] = useState("gemini-2.5-flash");
   const [preferredLanguage, setPreferredLanguage] = useState("");
-  const [backendEnvironment, setBackendEnvironment] = useState<"production" | "lab">("production");
+  const [backendEnvironment, setBackendEnvironment] = useState<BackendEnvironment>("production");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -50,7 +52,7 @@ export function SettingsPage() {
           setProvider(data.llm_provider ?? "gemini");
           setModel(data.llm_model ?? "gemini-2.5-flash");
           setPreferredLanguage(data.preferred_language ?? "");
-          setBackendEnvironment((data.backend_environment as "production" | "lab") ?? "production");
+          setBackendEnvironment((data.backend_environment as BackendEnvironment) ?? "production");
         }
       } catch (error) {
         console.error("[settings] load profile failed", error);
@@ -122,8 +124,20 @@ export function SettingsPage() {
                   Backend Environment
                 </Typography>
                 <Chip
-                  label={backendEnvironment === "production" ? "Production" : "Lab"}
-                  color={backendEnvironment === "production" ? "success" : "warning"}
+                  label={
+                    backendEnvironment === "production"
+                      ? "Production"
+                      : backendEnvironment === "lab"
+                        ? "Lab"
+                        : "Local"
+                  }
+                  color={
+                    backendEnvironment === "production"
+                      ? "success"
+                      : backendEnvironment === "lab"
+                        ? "warning"
+                        : "default"
+                  }
                   size="small"
                 />
               </Stack>
@@ -137,16 +151,17 @@ export function SettingsPage() {
               label="Environment"
               fullWidth
               value={backendEnvironment}
-              onChange={(event) => setBackendEnvironment(event.target.value as "production" | "lab")}
-              helperText={
-                backendEnvironment === "production"
-                  ? `✓ Connected to Production: ${import.meta.env.VITE_API_BASE_URL_PRODUCTION || 'Not configured'}`
-                  : `⚗️ Connected to Lab: ${import.meta.env.VITE_API_BASE_URL_LAB || 'Not configured'}`
-              }
+              onChange={(event) => setBackendEnvironment(event.target.value as BackendEnvironment)}
+              helperText={{
+                production: `✓ Connected to Production: ${import.meta.env.VITE_API_BASE_URL_PRODUCTION || 'Not configured'}`,
+                lab: `⚗️ Connected to Lab: ${import.meta.env.VITE_API_BASE_URL_LAB || 'Not configured'}`,
+                local: `💻 Connected to Local: ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}`,
+              }[backendEnvironment]}
               disabled={loading}
             >
               <MenuItem value="production">Production (Stable)</MenuItem>
               <MenuItem value="lab">Lab (Testing)</MenuItem>
+              <MenuItem value="local">Local (Developer)</MenuItem>
             </TextField>
           </Stack>
         </CardContent>
