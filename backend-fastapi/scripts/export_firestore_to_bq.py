@@ -227,6 +227,69 @@ def export_flashcard_reviews(db, bq_client, dataset_ref: str, user_id: Optional[
     
     return len(rows)
 
+def export_note_chunks(db, bq_client, dataset_ref: str, user_id: Optional[str] = None, dry_run: bool = False) -> int:
+    """Export note chunks collection (for RAG) to BigQuery."""
+    print("\n🧩 Exporting note chunks...")
+
+    # If a user filter is provided, precompute that user's note ids for filtering
+    allowed_note_ids = None
+    if user_id:
+        allowed_note_ids = set()
+        for note_doc in db.collection("notes").where("user_id", "==", user_id).stream():
+            allowed_note_ids.add(note_doc.id)
+        print(f"  User {user_id} has {len(allowed_note_ids)} notes for chunk export")
+
+    rows = []
+    for doc in db.collection("note_chunks").stream():
+        data = doc.to_dict()
+
+        # Try to resolve note_id from document data or path
+        note_id = data.get("note_id")
+        if not note_id:
+            try:
+                # Handles nested path like notes/{note_id}/chunks/{chunk_id}
+                note_id = doc.reference.parent.parent.id if doc.reference.parent and doc.reference.parent.parent else None
+            except Exception:
+                note_id = None
+
+        if not note_id:
+            # Skip records we can't associate to a note
+            continue
+
+        if allowed_note_ids is not None and note_id not in allowed_note_ids:
+            continue
+
+        content_preview = data.get("content_preview")
+        if not content_preview:
+            # Fall back to a shortened content field if present
+            content_preview = (data.get("content") or "")[:200]
+
+        row = {
+            "id": doc.id,
+            "note_id": note_id,
+            "chunk_index": data.get("chunk_index", 0),
+            "content_preview": content_preview,
+            "created_at": convert_timestamp(data.get("created_at")),
+        }
+        rows.append(row)
+
+    if dry_run:
+        print(f"  [DRY RUN] Would insert {len(rows)} note chunks")
+        if rows:
+            print(f"  Sample: {rows[0]}")
+    else:
+        if rows:
+            table_ref = f"{dataset_ref}.note_chunks"
+            errors = bq_client.insert_rows_json(table_ref, rows)
+            if errors:
+                print(f"  ❌ Errors: {errors}")
+            else:
+                print(f"  ✓ Inserted {len(rows)} note chunks")
+        else:
+            print("  ⚠ No note chunks found")
+
+    return len(rows)
+
 
 def convert_timestamp(ts) -> Optional[str]:
     """Convert Firestore timestamp to BigQuery-compatible ISO string."""
@@ -249,7 +312,7 @@ def main():
     parser.add_argument("--user-id", help="Filter by specific user ID")
     parser.add_argument(
         "--collections",
-        default="notes,flashcards,flashcard_reviews",
+        default="notes,flashcards,flashcard_reviews,note_chunks",
         help="Comma-separated list of collections to export"
     )
     parser.add_argument("--dry-run", action="store_true", help="Preview data without inserting")
@@ -294,6 +357,9 @@ def main():
     
     if "flashcard_reviews" in collections:
         total_exported += export_flashcard_reviews(db, bq_client, dataset_ref, args.user_id, args.dry_run)
+
+    if "note_chunks" in collections:
+        total_exported += export_note_chunks(db, bq_client, dataset_ref, args.user_id, args.dry_run)
     
     print(f"\n✅ Export complete! Total records: {total_exported}")
     if args.dry_run:
