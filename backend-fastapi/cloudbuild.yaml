@@ -19,6 +19,17 @@ steps:
       - '--all-tags'
       - 'us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/learningaier-backend'
 
+  # Step 3: Deploy to GKE
+  - name: 'gcr.io/cloud-builders/kubectl'
+    args:
+      - 'set'
+      - 'image'
+      - 'deployment/learningaier-backend'
+      - 'backend=us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/learningaier-backend:${SHORT_SHA}'
+    env:
+      - 'CLOUDSDK_COMPUTE_REGION=us-central1'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=learningaier-workers'
+
 # Build images to push
 images:
   - 'us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/learningaier-backend:${SHORT_SHA}'
