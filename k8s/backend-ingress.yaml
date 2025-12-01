@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: learningaier-backend-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.allow-http: "true"
+    networking.gke.io/managed-certificates: "backend-cert"
+    kubernetes.io/ingress.global-static-ip-name: "learningaier-backend-ip"
+spec:
+  rules:
+    - host: api.learningaier.com
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: learningaier-backend
+                port:
+                  number: 80
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: backend-cert
+spec:
+  domains:
+    - api.learningaier.com
