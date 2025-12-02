@@ -6,3 +6,5 @@ PyPDF2==3.0.1
 firebase-admin==6.2.0
 google-cloud-storage==2.10.0
 google-cloud-aiplatform==1.38.1
+redis>=5.0.0
+arq>=0.25.0

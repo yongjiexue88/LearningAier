@@ -1,0 +1,32 @@
+steps:
+  # Step 1: Build the worker Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+
+
+      - '-t'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/document-worker:latest'
+      - '-f'
+      - 'worker/Dockerfile'
+      - '.'
+    
+
+  # Step 2: Push the worker image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/document-worker'
+
+# Build images to push
+images:
+
+  - 'us-central1-docker.pkg.dev/${PROJECT_ID}/backend-images/document-worker:latest'
+
+# Build timeout
+timeout: '1200s'  # 20 minutes
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
