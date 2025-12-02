@@ -24,12 +24,7 @@ class APIClient {
     // Set baseUrl from environment
     this.baseUrl = this.getEnvironmentUrl();
 
-    // Log initialization
-    console.log(
-      "%c🌐 BACKEND ENVIRONMENT",
-      "background: #4CAF50; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
-      `\n Base URL: ${this.baseUrl}`
-    );
+
 
     this.initialized = true;
   }
@@ -68,7 +63,6 @@ class APIClient {
     await this.initialize();
 
     const { method = "POST", body, requireAuth = true } = options;
-    const startTime = performance.now();
 
     const headers: HeadersInit = {
       "Content-Type": "application/json",
@@ -85,30 +79,13 @@ class APIClient {
 
     const url = `${this.baseUrl}${endpoint}`;
 
-    // Determine current environment from baseUrl
-    const isLocal = this.baseUrl.includes("localhost") || this.baseUrl.includes("127.0.0.1");
-    const envLabel = isLocal ? "LOCAL 💻" : "PRODUCTION ✓";
 
-    // Log request
-    console.log(
-      "%c🔵 API REQUEST",
-      "background: #2196F3; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
-    );
-    console.group("Request Details");
-    console.log(`🌐 Environment: ${envLabel}`);
-    console.log(`📍 ${method} ${url}`);
-    if (body) {
-      console.log("📦 Request Body:", body);
-    }
-    console.groupEnd();
 
     const response = await fetch(url, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-
-    const duration = performance.now() - startTime;
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -121,33 +98,14 @@ class APIClient {
         errorMessage = errorText || `Request failed: ${response.status}`;
       }
 
-      // Log error
-      console.log(
-        "%c🔴 API ERROR",
-        "background: #F44336; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
-      );
-      console.group("Error Details");
-      console.log(`📊 Status: ${response.status}`);
-      console.log(`⏱️ Duration: ${duration.toFixed(0)}ms`);
-      console.log(`❌ Error: ${errorMessage}`);
-      console.groupEnd();
+
 
       throw new Error(errorMessage);
     }
 
     const data = await response.json();
 
-    // Log success response
-    console.log(
-      "%c🟢 API RESPONSE",
-      "background: #4CAF50; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
-    );
-    console.group("Response Details");
-    console.log(`📊 Status: ${response.status}`);
-    console.log(`⏱️ Duration: ${duration.toFixed(0)}ms`);
-    console.log("📥 Response Data:", data);
-    console.groupEnd();
-    console.log(""); // Empty line for spacing
+
 
     return data as Promise<TResponse>;
   }

@@ -4,6 +4,7 @@ from datetime import datetime
 from app.core.firebase import get_firestore_client
 from app.services.llm_service import LLMService
 from app.services.vector_service import VectorService
+from app.services.rag_service import RAGService
 from app.models.chat import ChatScope, SourceChunk
 
 
@@ -14,6 +15,7 @@ class ChatService:
         self.db = get_firestore_client()
         self.llm_service = LLMService()
         self.vector_service = VectorService()
+        self.rag_service = RAGService()
     
     async def start_conversation(
         self,
@@ -201,7 +203,7 @@ Student's question: {user_message}"""
         model_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Send a message and get AI response using RAG.
+        Send a message and get AI response using RAG with caching.
         
         Args:
             user_id: User ID
@@ -222,119 +224,43 @@ Student's question: {user_message}"""
         conv_data = conv_doc.to_dict()
         scope = ChatScope(**conv_data["scope"])
         
-        # 2. Retrieve recent message history (last 6 messages for context)
-        messages_ref = conv_ref.collection("messages")
-        recent_messages = (
-            messages_ref
-            .order_by("created_at", direction="DESCENDING")
-            .limit(6)
-            .stream()
-        )
-        
-        history = []
-        for msg_doc in recent_messages:
-            msg_data = msg_doc.to_dict()
-            history.append({
-                "role": msg_data["role"],
-                "content": msg_data["content"]
-            })
-        
-        # Reverse to chronological order
-        history.reverse()
-        
-        # 3. Resolve scope to filter for vector search
-        filter_dict = {"user_id": user_id}
-        
-        if scope.type == "doc" and scope.ids:
-            # Search only in specified documents/notes
-            if len(scope.ids) == 1:
-                filter_dict["note_id"] = scope.ids[0]
-            # For multiple docs, we'll need to search each separately and combine
-            # For now, we'll just use the filter as-is and let vector DB handle it
+        # 2. Resolve scope to note_id for RAGService
+        note_id = None
+        if scope.type == "doc" and scope.ids and len(scope.ids) == 1:
+            # Single document scope - pass note_id for caching
+            note_id = scope.ids[0]
         elif scope.type == "folder" and scope.ids:
-            # Need to resolve folder IDs to note IDs
+            # Folder scope - resolve to first note for now
+            # TODO: RAGService could support multiple note IDs
             note_ids = await self._resolve_folder_to_notes(user_id, scope.ids)
-            # Store for filtering (Pinecone doesn't support array containment, so we'll filter post-search)
-            filter_dict["_folder_notes"] = note_ids
-        # For "all", we just use user_id filter
+            if note_ids:
+                note_id = note_ids[0]  # Use first note for cache key
+        # For "all" scope or multiple docs, note_id remains None
         
-        # 4. Vector search for relevant context
-        query_embedding = await self.llm_service.generate_query_embedding(user_message)
-        
-        # Remove temporary filter keys that Pinecone won't understand
-        pinecone_filter = {k: v for k, v in filter_dict.items() if not k.startswith("_")}
-        
-        matches = await self.vector_service.query_vectors(
-            query_vector=query_embedding,
+        # 3. Call RAGService (with caching!)
+        rag_result = await self.rag_service.answer_question(
+            user_id=user_id,
+            note_id=note_id,
+            question=user_message,
             top_k=8,
-            filter=pinecone_filter
-        )
-        
-        # Post-filter for folder scope if needed
-        if scope.type == "folder" and "_folder_notes" in filter_dict:
-            folder_note_ids = set(filter_dict["_folder_notes"])
-            matches = [m for m in matches if m.metadata.get("note_id") in folder_note_ids]
-        
-        # 5. Build context chunks
-        context_chunks = []
-        sources = []
-        
-        for i, match in enumerate(matches[:8]):  # Limit to top 8
-            content = match.metadata.get("content", "")
-            context_chunks.append(f"[Source {i+1}] {content}")
-            sources.append(SourceChunk(
-                chunk_id=match.id,
-                note_id=match.metadata.get("note_id"),
-                doc_id=match.metadata.get("document_id"),
-                score=match.score,
-                preview=content[:250]
-            ))
-        
-        context = "\n\n".join(context_chunks)
-        
-        # 6. Build prompt with system instructions, history, and context
-        system_prompt = """You are a knowledgeable study tutor helping the student learn from their own materials.
-
-IMPORTANT GUIDELINES:
-- Answer questions based ONLY on the provided context from the student's notes and documents
-- If the context doesn't contain enough information to answer the question, say so honestly
-- Reference specific sources using [Source N] notation when making claims
-- Be clear, concise, and educational in your explanations
-- If asked to create quizzes or practice questions, base them on the context provided
-"""
-        
-        # Build conversation for LLM
-        llm_messages = [{"role": "system", "content": system_prompt}]
-        
-        # Add conversation history
-        for hist_msg in history:
-            llm_messages.append(hist_msg)
-        
-        # Add current question with context
-        user_prompt = f"""Context from student's materials:
-{context}
-
-Student's question: {user_message}"""
-        
-        llm_messages.append({"role": "user", "content": user_prompt})
-        
-        # 7. Call LLM
-        # Convert to simple format for generate_chat_completion
-        simple_messages = [{"role": m["role"], "content": m["content"]} for m in llm_messages if m["role"] != "system"]
-        
-        # Prepend system message to first user message
-        if simple_messages:
-            simple_messages[0]["content"] = system_prompt + "\n\n" + simple_messages[0]["content"]
-        
-        answer = await self.llm_service.generate_chat_completion(
-            messages=simple_messages,
-            temperature=0.7,
-            max_tokens=2000,
             model_name=model_name
         )
         
-        # 8. Save messages to Firestore
+        # 4. Convert RAGResult sources to SourceChunk format
+        sources = [
+            SourceChunk(
+                chunk_id=src.get("chunk_id"),
+                note_id=src.get("note_id"),
+                doc_id=src.get("document_id"),
+                score=src.get("score", 0.0),
+                preview=src.get("preview", "")
+            )
+            for src in rag_result.sources
+        ]
+        
+        # 5. Save messages to Firestore
         now = datetime.utcnow().isoformat() + "Z"
+        messages_ref = conv_ref.collection("messages")
         
         # Save user message
         user_msg_ref = messages_ref.document()
@@ -348,7 +274,7 @@ Student's question: {user_message}"""
         assistant_msg_ref = messages_ref.document()
         assistant_msg_ref.set({
             "role": "assistant",
-            "content": answer,
+            "content": rag_result.answer,
             "created_at": now,
             "sources": [s.model_dump() for s in sources] if sources else []
         })
@@ -357,7 +283,7 @@ Student's question: {user_message}"""
         conv_ref.update({"updated_at": now})
         
         return {
-            "answer": answer.strip(),
+            "answer": rag_result.answer.strip(),
             "sources": sources
         }
     

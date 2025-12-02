@@ -6,6 +6,13 @@ from app.config import get_settings
 from app.api import notes, documents, flashcards, graph, chat, analytics
 import time
 import json
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 
 @asynccontextmanager
@@ -41,6 +48,22 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"❌ Vertex AI initialization failed: {e}")
             raise
+    
+    # Initialize and test Redis connection
+    try:
+        from app.services.cache_service import get_cache_service
+        cache_service = get_cache_service()
+        print(f"📦 Redis URL: {settings.redis_url}")
+        print(f"🔄 Redis Cache Enabled: {settings.enable_redis_cache}")
+        if cache_service.enabled:
+            # Test connection
+            is_connected = await cache_service.ping()
+            if is_connected:
+                print("✅ Redis connection successful")
+            else:
+                print("⚠️  Redis ping failed, cache will be disabled")
+    except Exception as e:
+        print(f"⚠️  Redis initialization warning: {e}")
     
     print("="*80)
     

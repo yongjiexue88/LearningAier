@@ -75,7 +75,6 @@ export function DocumentsPage() {
         // Try with orderBy first
         const qWithOrder = query(baseQuery, orderBy("created_at", "desc"));
         const snapshot = await getDocs(qWithOrder);
-        console.log("[DocumentsPage] Fetched documents:", snapshot.docs.length);
         return snapshot.docs.map((docSnap) => ({
           id: docSnap.id,
           ...docSnap.data(),
@@ -83,7 +82,6 @@ export function DocumentsPage() {
       } catch (error: any) {
         // Fallback without orderBy if index is missing
         if (error?.code === "failed-precondition") {
-          console.warn("[DocumentsPage] Missing index, falling back to client-side sort");
           const snapshot = await getDocs(baseQuery);
           const docs = snapshot.docs.map((docSnap) => ({
             id: docSnap.id,
@@ -104,8 +102,6 @@ export function DocumentsPage() {
   });
 
   const documents = documentsQuery.data ?? [];
-
-  console.log("[DocumentsPage] Documents:", documents, "Loading:", documentsQuery.isLoading, "Error:", documentsQuery.error);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
