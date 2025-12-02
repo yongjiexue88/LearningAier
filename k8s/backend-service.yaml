@@ -4,6 +4,8 @@ metadata:
   name: learningaier-backend
   labels:
     app: learningaier-backend
+  annotations:
+    cloud.google.com/backend-config: '{"default": "backend-cors-config"}'
 spec:
   type: NodePort
   ports:

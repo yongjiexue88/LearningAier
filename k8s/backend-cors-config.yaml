@@ -1,0 +1,13 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: backend-cors-config
+spec:
+  # Enable CDN and CORS via custom response headers
+  customResponseHeaders:
+    headers:
+      - "Access-Control-Allow-Origin: *"
+      - "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH"
+      - "Access-Control-Allow-Headers: *"
+      - "Access-Control-Max-Age: 3600"
+      - "Access-Control-Allow-Credentials: true"

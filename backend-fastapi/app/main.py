@@ -69,7 +69,7 @@ app.include_router(analytics.router)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly for production
+    allow_origins=["*"],  # Allows all origins including Firebase Hosting (Dec 2, 2025)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
