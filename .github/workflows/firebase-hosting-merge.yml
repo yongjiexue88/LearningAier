@@ -28,6 +28,16 @@ jobs:
           VITE_API_BASE_URL_LAB: ${{ secrets.VITE_API_BASE_URL_LAB }}
           VITE_API_BASE_URL_PRODUCTION: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
         working-directory: frontend
+      
+      # Deploy Firestore rules automatically
+      - name: Deploy Firestore Rules
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only firestore:rules --project learningaier-lab --non-interactive
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LEARNINGAIER_LAB }}
+        working-directory: frontend
+      
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}

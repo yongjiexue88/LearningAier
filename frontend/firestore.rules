@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if user is accessing their own data
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to check if user owns the document by user_id field
+    function ownsDocument() {
+      return isAuthenticated() && resource.data.user_id == request.auth.uid;
+    }
+    
+    // Helper function to check if user will own the document being created
+    function willOwnDocument() {
+      return isAuthenticated() && request.resource.data.user_id == request.auth.uid;
+    }
+
+    // Top-level collections (current app structure)
+    match /folders/{folderId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /notes/{noteId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /flashcards/{flashcardId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /flashcard_reviews/{reviewId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /chats/{chatId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /whiteboards/{whiteboardId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /documents/{documentId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+    
+    match /note_versions/{versionId} {
+      allow read: if ownsDocument();
+      allow create: if willOwnDocument();
+      allow update, delete: if ownsDocument();
+    }
+
+    // Users collection (for subcollection pattern, if needed)
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      // Subcollections for user data
+      match /notes/{noteId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /flashcards/{flashcardId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /folders/{folderId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /chats/{chatId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /preferences/{prefId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Allow access to user_preferences collection if documents are keyed by userId
+    match /user_preferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Profiles collection - keyed by userId
+    match /profiles/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

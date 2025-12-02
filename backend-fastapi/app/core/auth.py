@@ -36,12 +36,14 @@ async def verify_firebase_token(
         uid = decoded_token["uid"]
         email = decoded_token.get("email")
         return AuthenticatedUser(uid=uid, email=email)
-    except auth.InvalidIdTokenError:
+    except auth.InvalidIdTokenError as e:
+        print(f"❌ Auth Error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token"
+            detail=f"Invalid authentication token: {str(e)}"
         )
     except Exception as e:
+        print(f"❌ Auth Exception: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}"

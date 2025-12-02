@@ -1,31 +1,17 @@
 """FastAPI application initialization"""
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.config import get_settings
 from app.api import notes, documents, flashcards, graph, chat, analytics
 import time
 import json
 
 
-app = FastAPI(
-    title="LearningAier API",
-    description="AI-powered note-taking and flashcard backend with RAG",
-    version="2.0.0"
-)
-
-# ... (rest of the file)
-
-# Include routers
-app.include_router(notes.router)
-app.include_router(documents.router)
-app.include_router(flashcards.router)
-app.include_router(graph.router)
-app.include_router(chat.router)
-app.include_router(analytics.router)
-
-@app.on_event("startup")
-async def startup_event():
-    """Log startup information and initialize Firebase + Vertex AI"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown events"""
+    # Startup
     from app.core.firebase import get_firebase_app
     
     settings = get_settings()
@@ -57,6 +43,27 @@ async def startup_event():
             raise
     
     print("="*80)
+    
+    yield  # Server runs here
+    
+    # Shutdown (if needed in the future)
+    print("👋 Shutting down LearningAier API")
+
+
+app = FastAPI(
+    title="LearningAier API",
+    description="AI-powered note-taking and flashcard backend with RAG",
+    version="2.0.0",
+    lifespan=lifespan
+)
+
+# Include routers
+app.include_router(notes.router)
+app.include_router(documents.router)
+app.include_router(flashcards.router)
+app.include_router(graph.router)
+app.include_router(chat.router)
+app.include_router(analytics.router)
 
 
 # CORS middleware

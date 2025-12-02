@@ -36,6 +36,10 @@ function createFirebaseApp(): FirebaseApp {
   if (getApps().length) {
     return getApps()[0]!;
   }
+  console.log("🔥 Firebase Config Loaded:", {
+    projectId: firebaseConfig.projectId,
+    authDomain: firebaseConfig.authDomain,
+  });
   return initializeApp(firebaseConfig);
 }
 

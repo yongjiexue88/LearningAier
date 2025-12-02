@@ -33,7 +33,14 @@ export function LoginPage() {
       await signIn({ email, password });
       navigate(from, { replace: true });
     } catch (err) {
-      setError((err as Error).message);
+      const errorMessage = (err as Error).message;
+      if (errorMessage.includes("400") || errorMessage.includes("INVALID_LOGIN_CREDENTIALS")) {
+        setError(
+          "Login failed. If you migrated from the old project, you must REGISTER again in this new environment."
+        );
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

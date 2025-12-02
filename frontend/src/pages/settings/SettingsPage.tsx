@@ -19,13 +19,13 @@ import { useAuth } from "../../providers/AuthProvider";
 import { apiClient } from "../../lib/apiClient";
 
 export function SettingsPage() {
-  type BackendEnvironment = "production" | "lab" | "local";
+
 
   const { user } = useAuth();
   const [provider, setProvider] = useState("gemini");
   const [model, setModel] = useState("gemini-2.5-flash");
   const [preferredLanguage, setPreferredLanguage] = useState("");
-  const [backendEnvironment, setBackendEnvironment] = useState<BackendEnvironment>("production");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -47,12 +47,11 @@ export function SettingsPage() {
             llm_provider?: string | null;
             llm_model?: string | null;
             preferred_language?: string | null;
-            backend_environment?: string | null;
+            preferred_language?: string | null;
           };
           setProvider(data.llm_provider ?? "gemini");
           setModel(data.llm_model ?? "gemini-2.5-flash");
           setPreferredLanguage(data.preferred_language ?? "");
-          setBackendEnvironment((data.backend_environment as BackendEnvironment) ?? "production");
         }
       } catch (error) {
         console.error("[settings] load profile failed", error);
@@ -78,17 +77,13 @@ export function SettingsPage() {
           llm_provider: provider,
           llm_model: model,
           preferred_language: preferredLanguage || null,
-          backend_environment: backendEnvironment,
         },
         { merge: true }
       );
 
-      // Reload API client to use new environment
-      await apiClient.reload();
-
       setSnackbar({
         open: true,
-        message: `Settings saved. Using ${backendEnvironment} backend.`,
+        message: "Settings saved.",
         severity: "success",
       });
     } catch (error) {
@@ -115,57 +110,7 @@ export function SettingsPage() {
         </Typography>
       </Box>
 
-      <Card>
-        <CardContent sx={{ p: 3 }}>
-          <Stack spacing={3}>
-            <Box>
-              <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-                <Typography variant="h6" fontWeight={600}>
-                  Backend Environment
-                </Typography>
-                <Chip
-                  label={
-                    backendEnvironment === "production"
-                      ? "Production"
-                      : backendEnvironment === "lab"
-                        ? "Lab"
-                        : "Local"
-                  }
-                  color={
-                    backendEnvironment === "production"
-                      ? "success"
-                      : backendEnvironment === "lab"
-                        ? "warning"
-                        : "default"
-                  }
-                  size="small"
-                />
-              </Stack>
-              <Typography variant="body2" color="text.secondary" mb={3}>
-                Choose which backend API to connect to. Production is the stable environment, while Lab is for testing new features.
-              </Typography>
-            </Box>
 
-            <TextField
-              select
-              label="Environment"
-              fullWidth
-              value={backendEnvironment}
-              onChange={(event) => setBackendEnvironment(event.target.value as BackendEnvironment)}
-              helperText={{
-                production: `✓ Connected to Production: ${import.meta.env.VITE_API_BASE_URL_PRODUCTION || 'Not configured'}`,
-                lab: `⚗️ Connected to Lab: ${import.meta.env.VITE_API_BASE_URL_LAB || 'Not configured'}`,
-                local: `💻 Connected to Local: ${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}`,
-              }[backendEnvironment]}
-              disabled={loading}
-            >
-              <MenuItem value="production">Production (Stable)</MenuItem>
-              <MenuItem value="lab">Lab (Testing)</MenuItem>
-              <MenuItem value="local">Local (Developer)</MenuItem>
-            </TextField>
-          </Stack>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardContent sx={{ p: 3 }}>

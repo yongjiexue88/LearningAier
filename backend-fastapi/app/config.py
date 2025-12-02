@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from typing import Optional
 
-from pydantic import field_validator
+from pydantic import field_validator, Field
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # Firebase
     firebase_project_id: str
     firebase_storage_bucket: str
-    firebase_credentials_json: Optional[str] = None
+    firebase_credentials_json: Optional[str] = Field(default=None)
     firebase_client_email: Optional[str] = None
     firebase_private_key: Optional[str] = None
     
@@ -77,9 +77,9 @@ class Settings(BaseSettings):
         import os
         from pydantic_settings import DotEnvSettingsSource
         
-        # Determine which .env file to use based on ENV variable
-        env = os.getenv("ENV", "local")
-        env_file = f".env.{env}" if env != "local" else ".env.local"
+        # Always load .env.local for local development
+        # In production (Cloud Run/GKE), environment variables are injected directly
+        env_file = ".env.local"
         
         # Create a new DotEnvSettingsSource with the correct file
         custom_dotenv = DotEnvSettingsSource(
