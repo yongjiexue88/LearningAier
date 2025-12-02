@@ -1,5 +1,4 @@
-import { firebaseAuth, firebaseDb } from "./firebaseClient";
-import { doc, getDoc } from "firebase/firestore";
+import { firebaseAuth } from "./firebaseClient";
 
 /**
  * Base API client with automatic auth token injection for FastAPI backend
@@ -16,84 +15,34 @@ class APIClient {
   }
 
   /**
-   * Initialize and load user's preferred backend environment
+   * Initialize the API client
    * Called automatically on first request
    */
   private async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    try {
-      const user = firebaseAuth.currentUser;
-      if (!user) {
-        // Not logged in, use default
-        console.log(
-          "%c🌐 BACKEND ENVIRONMENT",
-          "background: #9E9E9E; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
-          `\n📍 Environment: Default (Not logged in)\n🔗 Base URL: ${this.baseUrl}`
-        );
-        this.initialized = true;
-        return;
-      }
+    // Set baseUrl from environment
+    this.baseUrl = this.getEnvironmentUrl();
 
-      // Load user's environment preference from Firestore
-      const profileDoc = await getDoc(doc(firebaseDb, "profiles", user.uid));
-      const preferredEnv = profileDoc.exists()
-        ? (profileDoc.data().backend_environment as string | undefined)
-        : undefined;
-
-      // Set baseUrl based on preference
-      this.baseUrl = this.getEnvironmentUrl(preferredEnv);
-
-      // Log environment selection
-      console.log(
-        "%c🌐 BACKEND ENVIRONMENT",
-        preferredEnv === "lab"
-          ? "background: #FF9800; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;"
-          : "background: #4CAF50; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
-        `\n📍 Environment: ${preferredEnv === "lab" ? "LAB (Testing)" : "PRODUCTION (Stable)"}\n🔗 Base URL: ${this.baseUrl}`
-      );
-
-      this.initialized = true;
-    } catch (error) {
-      console.error("[apiClient] Failed to load environment preference:", error);
-      // Continue with default URL
-      this.initialized = true;
-    }
-  }
-
-  /**
-   * Get backend URL for a specific environment
-   */
-  private getEnvironmentUrl(environment?: string): string {
-    const labUrl = import.meta.env.VITE_API_BASE_URL_LAB;
-    const localUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
-
-    if (environment === "lab" && labUrl) {
-      return labUrl.replace(/\/$/, "");
-    }
-
-    if (environment === "local") {
-      return localUrl.replace(/\/$/, "");
-    }
-
-    // Fallback order: lab, then local/default
-    if (labUrl) return labUrl.replace(/\/$/, "");
-    return localUrl.replace(/\/$/, "");
-  }
-
-  /**
-   * Reload API client with latest environment preference
-   * Call this after user changes environment in settings
-   */
-  async reload(): Promise<void> {
-    this.initialized = false;
-    await this.initialize();
+    // Log initialization
     console.log(
-      "%c🔄 ENVIRONMENT SWITCHED",
-      "background: #2196F3; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
-      `\n✅ API client reloaded successfully\n🔗 New Base URL: ${this.baseUrl}`
+      "%c🌐 BACKEND ENVIRONMENT",
+      "background: #4CAF50; color: white; font-weight: bold; padding: 2px 8px; border-radius: 3px;",
+      `\n Base URL: ${this.baseUrl}`
     );
+
+    this.initialized = true;
   }
+
+  /**
+   * Get backend URL - always uses the configured VITE_API_BASE_URL
+   */
+  private getEnvironmentUrl(): string {
+    const url = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
+    return url.replace(/\/$/, "");
+  }
+
+
 
   /**
    * Get current Firebase ID token
@@ -137,10 +86,8 @@ class APIClient {
     const url = `${this.baseUrl}${endpoint}`;
 
     // Determine current environment from baseUrl
-    const isLab = this.baseUrl.includes("lab");
-    const isProd = this.baseUrl.includes("learningaier-api") && !isLab;
     const isLocal = this.baseUrl.includes("localhost") || this.baseUrl.includes("127.0.0.1");
-    const envLabel = isLab ? "LAB 🧪" : isProd ? "PROD ✓" : isLocal ? "LOCAL 💻" : "CUSTOM 🌐";
+    const envLabel = isLocal ? "LOCAL 💻" : "PRODUCTION ✓";
 
     // Log request
     console.log(
