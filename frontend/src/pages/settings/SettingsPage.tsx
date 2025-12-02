@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   MenuItem,
   Snackbar,
@@ -16,7 +15,6 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { firebaseDb } from "../../lib/firebaseClient";
 import { useAuth } from "../../providers/AuthProvider";
-import { apiClient } from "../../lib/apiClient";
 
 export function SettingsPage() {
 
@@ -46,7 +44,6 @@ export function SettingsPage() {
           const data = snap.data() as {
             llm_provider?: string | null;
             llm_model?: string | null;
-            preferred_language?: string | null;
             preferred_language?: string | null;
           };
           setProvider(data.llm_provider ?? "gemini");
