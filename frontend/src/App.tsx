@@ -22,7 +22,6 @@ function App() {
 
     console.group("Available Backend Environments");
     console.log(`🌐 Default: %c${import.meta.env.VITE_API_BASE_URL || 'Not set'}`, "color: #607D8B; font-weight: bold");
-    console.log(`✅ Production: %c${import.meta.env.VITE_API_BASE_URL_PRODUCTION || 'Not set'}`, "color: #4CAF50; font-weight: bold");
     console.log(`⚗️  Lab: %c${import.meta.env.VITE_API_BASE_URL_LAB || 'Not set'}`, "color: #FF9800; font-weight: bold");
     console.log(`💡 Tip: Switch environments in Settings page`);
     console.groupEnd();

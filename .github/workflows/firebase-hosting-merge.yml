@@ -26,7 +26,6 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_API_BASE_URL_LAB: ${{ secrets.VITE_API_BASE_URL_LAB }}
-          VITE_API_BASE_URL_PRODUCTION: ${{ secrets.VITE_API_BASE_URL_PRODUCTION }}
         working-directory: frontend
       
       # Deploy Firestore rules automatically

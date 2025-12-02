@@ -65,13 +65,8 @@ class APIClient {
    * Get backend URL for a specific environment
    */
   private getEnvironmentUrl(environment?: string): string {
-    const prodUrl = import.meta.env.VITE_API_BASE_URL_PRODUCTION;
     const labUrl = import.meta.env.VITE_API_BASE_URL_LAB;
     const localUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8787";
-
-    if (environment === "production" && prodUrl) {
-      return prodUrl.replace(/\/$/, "");
-    }
 
     if (environment === "lab" && labUrl) {
       return labUrl.replace(/\/$/, "");
@@ -81,8 +76,7 @@ class APIClient {
       return localUrl.replace(/\/$/, "");
     }
 
-    // Fallback order: production, lab, then local/default
-    if (prodUrl) return prodUrl.replace(/\/$/, "");
+    // Fallback order: lab, then local/default
     if (labUrl) return labUrl.replace(/\/$/, "");
     return localUrl.replace(/\/$/, "");
   }
