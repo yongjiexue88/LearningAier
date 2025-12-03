@@ -1,43 +1,59 @@
-# record_debug Index
+# record_debug/
 
-Grouped pointers to the ops/debug notes so related topics stay together. Duplicate HTTPS and worker port docs have been merged into the single files below.
+**Documentation has been consolidated into a single master document.**
 
-## Architecture & Environments
-- `ARCHITECTURE.md`
-- `backend_deployment_guide.md`
-- `CLOUD_BUILD_DEPLOY.md`, `github_secrets_setup_guide.md`
-- `system_upgrade_plan.md`, `system_upgrade_implementation_summary.md`
+## Primary Documentation
 
-## Networking, DNS, HTTPS
-- `gke_https_setup_guide.md` (includes mixed-content fix, Cloud Run fallback, GKE Ingress + managed cert, Cloudflare tunnel option)
-- `gke_networking_architecture.md`, `dns_setup_guide.md`
+📘 **[MASTER_MANUAL.md](./MASTER_MANUAL.md)** - Complete system documentation
+- System Architecture & Overview
+- Backend Services (Configuration, Deployment, BigQuery, Vertex AI, ML, Testing)
+- Frontend Architecture (API Integration, Migration, ML, Whiteboard)
+- Infrastructure & GKE (Worker Architecture, Networking, HTTPS, DNS, Pod Management, Redis)
+- CI/CD & Automation (Cloud Build, GitHub Secrets, Firestore Rules)
+- Firebase, Firestore & Redis (Secret Management, Quick Reference, Local Testing)
+- System Upgrades & Evolution
+- Debugging & Troubleshooting (Auth, Incidents, Bug History)
+- Local Development (How to Run, Testing Guides)
+- Miscellaneous (Pomodoro, etc.)
 
-## Worker, Ports, Redis
-- `worker_port_fix.md` (merged timeline of port fixes)
-- `worker_loadbalancer_removal.md`
-- `redis_gke_deployment_guide.md`, `local_redis_testing_guide.md`
-- `port_configuration_audit.md`
+📋 **[MERGE_MAPPING.md](./MERGE_MAPPING.md)** - File merge mapping table
+- Shows where each original file's content was merged
+- Verification checklist
+- Complete traceability
 
-## Backend Ops & Services
-- `backend_startup_and_config.md`, `backend_single_pod_config.md`
-- `backend_BIGQUERY_SETUP_GUIDE.md`
-- `backend_VERTEX_AI_INTEGRATION.md`, `backend_TEST_STATUS.md`
-- `gce_quota_and_pod_workarounds.md`
+## Quick Links
 
-## Frontend
-- `frontend_FRONTEND_API.md`, `frontend_MIGRATION_GUIDE.md`, `frontend_migration_plan.md`
-- `frontend_WHITEBOARD_IMPLEMENTATION.md`, `FRONTEND_ML_INTEGRATION.md`
-- `local_frontend_testing_guide.md`
+| Topic | Section in MASTER_MANUAL.md |
+|-------|----------------------------|
+| **System Overview** | Section 1 - System Architecture |
+| **How to Run Locally** | Section 9.1 - Local Development |
+| **GKE & Kubernetes** | Section 4 - Infrastructure & GKE |
+| **Backend Deployment** | Section 2.2 - Backend Deployment |
+| **BigQuery Setup** | Section 2.3 - BigQuery Integration |
+| **Redis & Caching** | Section 4.9, 6.3 - Redis |
+| **Auth Troubleshooting** | Section 8.1 - Debugging |
+| **Incident History** | Section 8.2 - Incident Logs |
 
-## Auth & Firestore
-- `auth_troubleshooting_guide.md`, `firebase_secret_update.md`
-- `firestore_quick_reference.md`, `firestore_rules_automation.md`, `firestore_rules_iam_permissions_guide.md`
+## Workflow
 
-## ML & LLMOps
-- `LLMOPS_GUIDE.md`, `gemini.md`
-- `ml_integration_fix_experience.md`
-- `pomodoro_notes.md`
+**All documentation is now centralized in MASTER_MANUAL.md.**
 
-## Incident/Bug Logs
-- `bug_history.md`, `cleanup_old_url_summary.md`
-- Dated hotfixes: `2025-12-01_firestore_whiteboard_permissions_fix.md`, `2025-12-02_backend_cors_deployment_fix.md`, `2025-12-02_deployment_fix_and_config_simplification.md`, `2025-12-02_redis_caching_chat_refactoring.md`
+- ✅ Search one document instead of 40+ files
+- ✅ Consistent formatting and organization
+- ✅ Easy to maintain and update
+- ✅ Full version control via git
+
+## Adding New Documentation
+
+When adding new content:
+
+1. Open `MASTER_MANUAL.md`
+2. Find the appropriate section (or add a new one)
+3. Add your content with clear headers
+4. Commit to git with descriptive message
+
+## History
+
+- **December 2025**: Consolidated 40+ scattered markdown files into unified MASTER_MANUAL.md
+- All original content preserved with zero information loss
+- Organized into 10 major sections for easy navigation
