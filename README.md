@@ -26,6 +26,7 @@ flowchart LR
     API --> Pinecone[(Pinecone<br/>Vector DB)]
     API --> Gemini[Vertex AI / Gemini]
     API --> BigQuery[(BigQuery<br/>LLMOps/Analytics)]
+    Firestore -->|daily cron export| BigQuery
 
     API -->|queue PDF jobs| Redis[(Redis Queue)]
     Redis --> Worker[Document Worker<br/>GKE Deployment + Service]
@@ -47,6 +48,8 @@ flowchart LR
 
 - GKE hosts the FastAPI backend, document Worker, and Redis queue (see `k8s/` and `record_debug/GKE_WORKER_ARCHITECTURE.md`)
 - Cloud Build + Cloud Deploy pipeline defined in `clouddeploy.yaml` and `record_debug/CLOUD_BUILD_DEPLOY.md`
+- IAM secures service accounts/roles; Cloud DNS + HTTPS load balancing provide custom-domain TLS for the backend API
+- Firestore data syncs to BigQuery via a daily cron job for analytics
 - Firebase covers Auth/Firestore/Storage; Pinecone handles vector retrieval; BigQuery captures LLM and learning analytics
 
 ## Tech Stack
