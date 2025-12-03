@@ -1,209 +1,124 @@
-# LearningAier
+# LearningAier | AI Bilingual Learning & Memory Assistant
 
-> AI-powered bilingual (Chinese/English) note-taking and flashcard application with RAG-based question answering
+Language toggle: English | 中文 (content below is English-only)
 
-## Features
+> Portfolio-style overview of AI bilingual notes, RAG chat, flashcards with ML scheduling, PDF processing, knowledge graph, collaborative whiteboard, and analytics
 
-- 📝 **Bilingual Notes**: Create and manage notes in Chinese and English with Markdown support
-- 🤖 **AI Translation**: Automatic translation between Chinese and English using Google Gemini / Vertex AI
-- 💬 **Chat with Your Notes**: RAG-powered Q&A over your note collection with streaming responses
-- 📄 **PDF Processing**: Upload PDFs, auto-extract text via GKE worker, and index for semantic search
-- 🎴 **Smart Flashcards**: AI-generated flashcards with ML-powered spaced repetition scheduling
-- 🔍 **Semantic Search**: Vector-based similarity search powered by Pinecone
-- 📚 **Terminology Extraction**: Auto-extract bilingual technical terms from notes
-- 🧪 **LLMOps**: Prompt versioning, A/B testing, structured logging, and cost tracking
-- 📊 **Analytics**: BigQuery-powered insights into learning patterns and LLM usage
+## Product Highlights
+- 📝 Bilingual notes with AI translation and terminology extraction
+- 🤖 RAG Q&A and streaming chat using Vertex AI / Google Gemini
+- 🎴 Flashcards auto-generation + ML spaced-repetition scheduler (XGBoost/RandomForest)
+- 📄 PDF upload → GKE Worker text extraction/embeddings → Pinecone retrieval
+- 🕸️ Knowledge graph, collaborative whiteboard, pomodoro, and study tools
+- 📊 BigQuery + LLMOps logging for cost, prompts, and behavior analytics
+
+## Runtime Architecture
+
+```mermaid
+flowchart LR
+    User[Browser<br/>React SPA] --> Hosting[Firebase Hosting<br/>CDN]
+    Hosting --> API[Cloud Run<br/>FastAPI API]
+    User -->|SDK| Auth[Firebase Auth]
+    User -->|Realtime/Offline| Firestore[(Firestore)]
+
+    API -->|ID Token verify| Auth
+    API --> Firestore
+    API --> Storage[(Cloud Storage)]
+    API --> Pinecone[(Pinecone<br/>Vector DB)]
+    API --> Gemini[Vertex AI / Gemini]
+    API --> BigQuery[(BigQuery<br/>LLMOps/Analytics)]
+
+    API -->|queue PDF jobs| Redis[(Redis Queue)]
+    Redis --> Worker[GKE Autopilot<br/>Document Worker]
+    Worker --> Storage
+    Worker --> Firestore
+    Worker --> Pinecone
+```
+
+## Cloud & DevOps (Google Cloud + Firebase)
+
+```mermaid
+flowchart LR
+    GitHub[GitHub Actions] --> CB[Cloud Build]
+    CB --> AR[Artifact Registry]
+    AR --> CD[Cloud Deploy<br/>dev → stg]
+    CD --> Run[Cloud Run API]
+    CD --> GKE[GKE Worker]
+    GitHub --> Hosting[Firebase Hosting]
+```
+
+- Cloud Run serves the main API; GKE Autopilot hosts the document Worker + Redis queue (see `k8s/` and `record_debug/GKE_WORKER_ARCHITECTURE.md`)
+- Cloud Build + Cloud Deploy pipeline defined in `clouddeploy.yaml` and `record_debug/CLOUD_BUILD_DEPLOY.md`
+- Firebase covers Auth/Firestore/Storage; Pinecone handles vector retrieval; BigQuery captures LLM and learning analytics
 
 ## Tech Stack
+- **Frontend**: React 18 + Vite 5 + TypeScript, Material UI 7, Tailwind, TanStack Query, Firebase SDK (Auth/Firestore/Storage), deployed on Firebase Hosting
+- **Backend**: FastAPI (Python 3.11), Firebase Admin, Vertex AI / Gemini, Pinecone, XGBoost/RandomForest scheduler, deployed on Cloud Run
+- **Worker**: GKE Autopilot document microservice (FastAPI + Redis/ARQ) for PDF parsing and bulk embeddings
+- **Data/ML**: text-embedding-004 (768 dims), Pinecone similarity search, BigQuery analytics
+
+## Modules & Layout
+```
+.
+├── frontend/                 # React web (pages, components, hooks, services, lib)
+├── backend-fastapi/          # FastAPI API (app/api|services|core|models)
+│   └── worker/               # Document/embedding Worker (Redis queue)
+├── k8s/                      # GKE manifests (backend, worker, redis, ingress)
+├── deploy-manifests/         # Cloud Run / infra manifests
+├── clouddeploy.yaml          # Cloud Deploy pipeline (dev→stg)
+├── record_debug/             # Architecture/ops notes and debug records
+└── model.joblib              # Flashcard scheduling model
+```
+
+## Run Locally
 
 ### Frontend
-- React 18 + Vite 5 + TypeScript
-- Material UI 7 + Tailwind CSS
-- TanStack Query (React Query) for state management
-- Firebase SDK (Auth + Firestore client)
-- Deployed on Firebase Hosting
-
-### Backend
-- FastAPI + Python 3.11
-- Firebase Admin SDK (Auth + Firestore + Cloud Storage)
-- Google Gemini API / Vertex AI (LLM + Embeddings)
-- Pinecone Vector Database
-- XGBoost / RandomForest (ML Scheduler)
-- Deployed on Google Cloud Run
-
-### Infrastructure
-- **Firebase**: Authentication, Firestore, Cloud Storage
-- **Google Cloud Run**: Backend API (serverless)
-- **GKE Autopilot**: Document Worker Service (PDF processing)
-- **Cloud Build**: CI for Docker images
-- **Cloud Deploy**: CD pipeline (dev → staging)
-- **Vertex AI**: LLM provider for lab environment
-- **BigQuery**: Analytics and LLMOps logging
-- **GitHub Actions**: CI/CD for frontend and legacy backend
-
-## Quick Start
-
-### Prerequisites
-- Node.js 18+ and npm
-- Python 3.11+
-- Firebase project ([create one](https://console.firebase.google.com/))
-- Google Gemini API key ([get one](https://ai.google.dev/))
-- Pinecone account ([create one](https://www.pinecone.io/))
-
-### Frontend Setup
-
 ```bash
 cd frontend
 npm install
-cp .env.local.template .env.local
-# Edit .env.local with your Firebase config
-npm run dev
-```
-
-Frontend will run at http://localhost:5173
-
-### Backend Setup
-
-```bash
-cd backend-fastapi
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\\Scripts\\activate
-pip install -r requirements.txt
-cp .env.local.template .env.local
-# Edit .env.local with your credentials
-uvicorn app.main:app --reload --port 8787
-```
-
-Backend will run at http://localhost:8787
-
-**API Docs**: http://localhost:8787/docs
-
-### Environment Variables
-
-#### Frontend (.env.local)
-```env
+# Create frontend/.env.local (example)
+cat > .env.local <<'EOF'
 VITE_FIREBASE_API_KEY=your_api_key
 VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXX
 VITE_API_BASE_URL=http://localhost:8787
+EOF
+npm run dev
 ```
+Dev server: `http://localhost:5173`
 
-#### Backend (.env.local)
-See [backend-fastapi/.env.local.template](backend-fastapi/.env.local.template) for all required variables.
-
-Key variables:
-- `FIREBASE_CREDENTIALS_JSON`: Service account JSON
-- `LLM_API_KEY`: Google Gemini API key
-- `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `PINECONE_INDEX_HOST`: Vector DB config
-
-## Project Structure
-
-```
-learningaier/
-├── frontend/               # React application
-│   ├── src/
-│   │   ├── pages/         # Main pages (notes, documents, flashcards)
-│   │   ├── components/    # Reusable UI components
-│   │   ├── services/      # API client + React Query hooks
-│   │   └── lib/           # Utilities (Firebase, API client)
-│   └── package.json
-├── backend-fastapi/       # FastAPI backend
-│   ├── app/
-│   │   ├── api/           # Route handlers
-│   │   ├── services/      # Business logic (LLM, RAG, Vector DB)
-│   │   ├── core/          # Auth, Firebase, exceptions
-│   │   └── models/        # Pydantic schemas
-│   └── requirements.txt
-├── .github/workflows/     # CI/CD pipelines
-├── ARCHITECTURE.md        # Detailed architecture docs
-├── .gemini.md            # AI/Gemini usage guide (legacy, see gemini.md)
-├── gemini.md             # Updated AI optimization guide
-└── TODO.md               # Prioritized action items
-```
-
-## Documentation
-
-### Architecture & Setup
-- **[ARCHITECTURE.md](ARCHITECTURE.md)**: System architecture, data flows, deployment guide
-- **[DEPLOYMENT_ENVIRONMENTS.md](backend-fastapi/DEPLOYMENT_ENVIRONMENTS.md)**: Multi-environment setup (local, lab, prod)
-- **[CLOUD_BUILD_DEPLOY.md](CLOUD_BUILD_DEPLOY.md)**: CI/CD with Cloud Build and Cloud Deploy
-- **[GKE_WORKER_ARCHITECTURE.md](GKE_WORKER_ARCHITECTURE.md)**: GKE Autopilot worker service setup
-
-### LLMOps & ML
-- **[LLMOPS_GUIDE.md](LLMOPS_GUIDE.md)**: Prompt versioning, monitoring, A/B testing
-- **[ML Pipeline Guide](backend-fastapi/ml/flashcard_interval_model/GUIDE.md)**: ML scheduler deployment on Vertex AI
-
-### Development
-- **[gemini.md](gemini.md)**: AI/Gemini usage patterns and optimization strategies
-- **[TODO.md](TODO.md)**: Prioritized improvement roadmap
-- **[Frontend API Guide](frontend/FRONTEND_API.md)**: API integration patterns
-
-## Deployment
-
-### Frontend (Firebase Hosting)
-```bash
-cd frontend
-npm run build
-firebase deploy --only hosting --project your-project-id
-```
-
-Auto-deploys via GitHub Actions on push to `main`.
-
-### Backend (Google Cloud Run)
+### Backend API (FastAPI / Cloud Run equivalent)
 ```bash
 cd backend-fastapi
-gcloud builds submit --tag gcr.io/your-project-id/backend-api
-gcloud run deploy learningaier-api \\
-  --image gcr.io/your-project-id/backend-api \\
-  --platform managed \\
-  --region us-central1 \\
-  --allow-unauthenticated \\
-  --env-vars-file env.yaml
+python -m venv venv
+source venv/bin/activate  # Windows: venv\\Scripts\\activate
+pip install -r requirements.txt
+cp .env.local.template .env.local   # Edit PORT, Firebase, Gemini, Pinecone as needed
+uvicorn app.main:app --reload --port 8787
 ```
+API: `http://localhost:8787` (Swagger: `/docs`)
 
-See [backend-fastapi/README.md](backend-fastapi/README.md) for detailed deployment guide.
-
-Auto-deploys via GitHub Actions on push to `main` (when `backend-fastapi/**` changes).
-
-## Development Workflow
-
-1. **Create a feature branch**: `git checkout -b feature/my-feature`
-2. **Make changes** (frontend and/or backend)
-3. **Test locally**: Run both frontend and backend dev servers
-4. **Commit and push**: `git push origin feature/my-feature`
-5. **Open PR**: GitHub Actions will run preview deployments
-6. **Merge to main**: Auto-deploys to production
-
-## Testing
-
-### Backend Tests
+### Document Worker (optional for local PDF queue)
 ```bash
+# Requires local Redis (e.g., docker run -p 6379:6379 redis:7)
 cd backend-fastapi
-source venv/bin/activate
-PYTHONPATH=. pytest -v
+uvicorn worker.main:app --reload --port 8000
 ```
+Point `REDIS_URL` to your Redis; production uses GKE + Redis Service.
 
-### Frontend (Manual Testing)
-- Run `npm run dev` and test in browser
-- Check browser console for errors
-- Verify Firebase Auth, Firestore, and API calls
+## Deployment Snapshot
+- **Frontend**: `npm run build`, deploy via Firebase Hosting (automated by GitHub Actions)
+- **Backend API**: Cloud Build → Cloud Deploy → Cloud Run; config in `clouddeploy.yaml`
+- **Worker**: Same pipeline to Artifact Registry; GKE Autopilot rolling updates (`k8s/worker-*.yaml`)
+- **Environment Switching**: `backend-fastapi/DEPLOYMENT_ENVIRONMENTS.md` (local / lab / prod, Vertex AI vs Google AI)
 
-## Contributing
-
-1. Follow existing code style (TypeScript for frontend, Python PEP 8 for backend)
-2. Add tests for new features
-3. Update documentation as needed
-4. Submit PR with clear description
-
-## License
-
-MIT
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/LearningAier/issues)
-- **Documentation**: See `/docs` directory and inline code comments
-- **API Docs**: http://localhost:8787/docs (when backend is running)
+## Key Docs (record_debug/)
+- Architecture: `record_debug/ARCHITECTURE.md`
+- GKE Worker: `record_debug/GKE_WORKER_ARCHITECTURE.md`
+- CI/CD: `record_debug/CLOUD_BUILD_DEPLOY.md`
+- Deployment & environments: `record_debug/backend_DEPLOYMENT_ENVIRONMENTS.md`, `record_debug/backend_DEPLOYMENT_SUMMARY.md`
+- Local debugging: `record_debug/HOW_TO_RUN.md`, `record_debug/local_frontend_testing_guide.md`
