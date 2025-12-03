@@ -116,6 +116,14 @@ When you changed the service type from `LoadBalancer` to `ClusterIP`:
 
 ---
 
+## Where to View the Remaining LB
+- Kubernetes: **GKE → Services & Ingress** shows `learningaier-backend` (LoadBalancer) plus internal ClusterIP services.
+- GCP: **Network Services → Load balancing** lists the underlying Network TCP/UDP LB backing `learningaier-backend`.
+
+Only the backend LB should remain; worker is ClusterIP-only.
+
+---
+
 ## Important Notes
 
 ### ⚠️ Breaking Changes (if any):

@@ -4,13 +4,13 @@ Grouped pointers to the ops/debug notes so related topics stay together. Duplica
 
 ## Architecture & Environments
 - `ARCHITECTURE.md`
-- `backend_deployment_guide.md`, `LAB_DEPLOYMENT_SETUP.md`, `DUAL_ENVIRONMENT_SETUP.md`
+- `backend_deployment_guide.md`
 - `CLOUD_BUILD_DEPLOY.md`, `github_secrets_setup_guide.md`
 - `system_upgrade_plan.md`, `system_upgrade_implementation_summary.md`
 
 ## Networking, DNS, HTTPS
 - `gke_https_setup_guide.md` (includes mixed-content fix, Cloud Run fallback, GKE Ingress + managed cert, Cloudflare tunnel option)
-- `gke_networking_architecture.md`, `loadbalancer_explanation.md`, `dns_setup_guide.md`
+- `gke_networking_architecture.md`, `dns_setup_guide.md`
 
 ## Worker, Ports, Redis
 - `worker_port_fix.md` (merged timeline of port fixes)
@@ -20,8 +20,9 @@ Grouped pointers to the ops/debug notes so related topics stay together. Duplica
 
 ## Backend Ops & Services
 - `backend_startup_and_config.md`, `backend_single_pod_config.md`
-- `backend_BIGQUERY_SETUP_GUIDE.md`, `export_firestore_to_bigquery.md`
+- `backend_BIGQUERY_SETUP_GUIDE.md`
 - `backend_VERTEX_AI_INTEGRATION.md`, `backend_TEST_STATUS.md`
+- `gce_quota_and_pod_workarounds.md`
 
 ## Frontend
 - `frontend_FRONTEND_API.md`, `frontend_MIGRATION_GUIDE.md`, `frontend_migration_plan.md`
@@ -40,4 +41,3 @@ Grouped pointers to the ops/debug notes so related topics stay together. Duplica
 ## Incident/Bug Logs
 - `bug_history.md`, `cleanup_old_url_summary.md`
 - Dated hotfixes: `2025-12-01_firestore_whiteboard_permissions_fix.md`, `2025-12-02_backend_cors_deployment_fix.md`, `2025-12-02_deployment_fix_and_config_simplification.md`, `2025-12-02_redis_caching_chat_refactoring.md`
-- Pomodoro: `pomodoro_bugfixes_2025-12-02.md`, `pomodoro_implementation_2025-12-02.md`

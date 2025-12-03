@@ -40,6 +40,39 @@ ENV=lab uvicorn app.main:app --reload --port 8080
 | Prod | `uvicorn app.main:app --reload` | `.env.local` | Google AI | `deploy-backend.yml` |
 | Lab  | `ENV=lab uvicorn app.main:app --reload` | `.env.lab` | Vertex AI | `deploy-backend-lab.yml` |
 
+### Manual bootstrap (lab or new env)
+1) Set project: `gcloud config set project learningaier-lab`  
+2) Create deploy SA:
+```bash
+gcloud iam service-accounts create github-actions-lab \
+  --display-name="GitHub Actions Lab Deployment"
+gcloud projects add-iam-policy-binding learningaier-lab \
+  --member="serviceAccount:github-actions-lab@learningaier-lab.iam.gserviceaccount.com" \
+  --role="roles/run.admin"
+gcloud projects add-iam-policy-binding learningaier-lab \
+  --member="serviceAccount:github-actions-lab@learningaier-lab.iam.gserviceaccount.com" \
+  --role="roles/storage.admin"
+gcloud projects add-iam-policy-binding learningaier-lab \
+  --member="serviceAccount:github-actions-lab@learningaier-lab.iam.gserviceaccount.com" \
+  --role="roles/iam.serviceAccountUser"
+```
+3) Create key and add to GitHub secret `GCP_SA_KEY_LAB`:
+```bash
+gcloud iam service-accounts keys create ~/learningaier-lab-key.json \
+  --iam-account=github-actions-lab@learningaier-lab.iam.gserviceaccount.com
+cat ~/learningaier-lab-key.json  # paste into GitHub secret
+```
+4) Initial manual deploy (one-time) if needed:
+```bash
+cd backend-fastapi
+gcloud builds submit --tag gcr.io/learningaier-lab/backend-api
+gcloud run deploy learningaier-api-lab \
+  --image gcr.io/learningaier-lab/backend-api \
+  --platform managed --region us-central1 --allow-unauthenticated \
+  --set-env-vars "APP_ENV=lab"
+```
+5) Update frontend envs with the lab URL from the deploy output.
+
 ### Verification
 ```bash
 gcloud run services describe learningaier-api       --region=us-central1 --project=learningaier

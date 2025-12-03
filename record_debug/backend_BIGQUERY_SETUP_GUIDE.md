@@ -36,7 +36,7 @@ gcloud services enable bigquery.googleapis.com
 
 ## 2. Data Export (Firestore → BigQuery)
 
-We use a Python script to export data from Firestore to BigQuery.
+We use Python scripts to export/sync Firestore to BigQuery.
 
 ### Dry Run (Validation)
 Check what data will be exported without actually inserting it.
@@ -58,6 +58,15 @@ If you only need to update specific tables (e.g., just flashcards).
 
 ```bash
 python3 scripts/export_firestore_to_bq.py --env lab --collections flashcards
+```
+
+### Quick minimal cheatsheet (from CLI)
+```bash
+gcloud auth application-default login
+gcloud config set project learningaier-lab
+cd backend-fastapi && source venv/bin/activate
+python scripts/export_firestore_to_bq.py --env lab --dry-run --collections notes,flashcards,flashcard_reviews,note_chunks
+python scripts/export_firestore_to_bq.py --env lab --collections notes,flashcards,flashcard_reviews,note_chunks
 ```
 
 ### Troubleshooting: Flashcard Export
