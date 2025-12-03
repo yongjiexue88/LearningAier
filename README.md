@@ -20,7 +20,7 @@ Language: [English](#english) | [中文](#中文)
 flowchart LR
     User[Browser<br/>React SPA] --> Hosting[Firebase Hosting<br/>CDN]
     Hosting --> Ingress[HTTPS Load Balancer<br/>GKE Ingress]
-    Ingress --> API[GKE (FastAPI API)<br/>Deployment + Service]
+    Ingress --> API[FastAPI API<br/>GKE Deployment + Service]
     User -->|SDK| Auth[Firebase Auth]
     User -->|Realtime/Offline| Firestore[(Firestore)]
 
@@ -32,7 +32,7 @@ flowchart LR
     API --> BigQuery[(BigQuery<br/>LLMOps/Analytics)]
 
     API -->|queue PDF jobs| Redis[(Redis Queue)]
-    Redis --> Worker[GKE (Document Worker)<br/>Deployment + Service]
+    Redis --> Worker[Document Worker<br/>GKE Deployment + Service]
     Worker --> Storage
     Worker --> Firestore
     Worker --> Pinecone
@@ -141,7 +141,7 @@ Point `REDIS_URL` to your Redis; production uses GKE + Redis Service.
 flowchart LR
     User[浏览器<br/>React SPA] --> Hosting[Firebase Hosting<br/>CDN]
     Hosting --> Ingress[HTTPS 负载均衡<br/>GKE Ingress]
-    Ingress --> API[GKE（FastAPI API）<br/>Deployment + Service]
+    Ingress --> API[FastAPI API<br/>GKE Deployment + Service]
     User -->|SDK| Auth[Firebase Auth]
     User -->|实时/离线| Firestore[(Firestore)]
 
@@ -153,7 +153,7 @@ flowchart LR
     API --> BigQuery[(BigQuery<br/>LLMOps/Analytics)]
 
     API -->|入队 PDF 任务| Redis[(Redis Queue)]
-    Redis --> Worker[GKE（Document Worker）<br/>Deployment + Service]
+    Redis --> Worker[Document Worker<br/>GKE Deployment + Service]
     Worker --> Storage
     Worker --> Firestore
     Worker --> Pinecone
