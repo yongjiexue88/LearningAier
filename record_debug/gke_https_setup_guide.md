@@ -1,113 +1,73 @@
-# How to Use Your GKE Backend from Production (HTTPS Setup)
+# GKE HTTPS & Mixed Content Playbook
 
-## Current Situation
-- ✅ **GKE Backend is running** at `http://34.123.200.75` (HTTP only)
-- ❌ **Cannot use it from production** because `https://learningaier.web.app` cannot make HTTP requests
+## Problem
+- Frontend on HTTPS (Firebase Hosting) could not call the GKE backend on HTTP, triggering mixed-content blocks.
+- Error example:
+  ```
+  Mixed Content: The page at 'https://learningaier.web.app/' was loaded over HTTPS,
+  but requested an insecure resource 'http://34.123.200.75/...'
+  ```
 
-## Two Options
+## Current Endpoints (when issue occurred)
+1) Prod Cloud Run (HTTPS): `https://learningaier-api-330193246496.us-central1.run.app`  
+2) Lab Cloud Run (HTTPS): `https://learningaier-api-lab-286370893156.us-central1.run.app`  
+3) Lab GKE Backend (HTTP only): `http://34.123.200.75` (Vertex AI, Redis, Worker)
 
-### Option 1: Use Lab Cloud Run (Quick Fix) ✅ **CURRENTLY APPLIED**
-**File:** `frontend/.env.production`
-```bash
-VITE_API_BASE_URL_LAB=https://learningaier-api-lab-286370893156.us-central1.run.app
-```
+## Quick Fix (Applied)
+- Pointed frontend to Cloud Run HTTPS endpoint:
+  ```bash
+  # frontend/.env.production
+  VITE_API_BASE_URL_LAB=https://learningaier-api-lab-286370893156.us-central1.run.app
+  ```
+- Pros: instant, HTTPS. Cons: bypasses GKE features (Redis/Worker).
 
-**Pros:**
-- Works immediately with HTTPS
-- Has Vertex AI integration
-- No additional setup needed
+## Preferred Fix (HTTPS on GKE with Managed Cert)
 
-**Cons:**
-- Not using your GKE deployment
-- Missing Redis/Worker features you have in GKE
+Prereqs: domain + DNS access (Cloud DNS or other), static IP, and GKE Ingress.
 
----
-
-### Option 2: Add HTTPS to GKE Backend (Use Your GKE Deployment)
-
-To use your GKE backend from production, you need HTTPS. Here are your choices:
-
-#### **2A: Use Google Cloud Load Balancer with Auto-SSL** (Recommended)
-
-**Requirements:**
-- A domain name (e.g., `learningaier.com` or subdomain like `api-lab.learningaier.com`)
-- DNS access to create an A record
-
-**Steps:**
-
-##### 1. Reserve a Static IP
+1) Reserve global static IP  
 ```bash
 gcloud compute addresses create learningaier-backend-ip \
-  --global \
-  --ip-version IPV4 \
-  --project learningaier-lab
-```
-
-Get the IP address:
-```bash
+  --global --ip-version IPV4 --project learningaier-lab
 gcloud compute addresses describe learningaier-backend-ip \
-  --global \
-  --project learningaier-lab \
-  --format="get(address)"
+  --global --project learningaier-lab --format='get(address)'
 ```
 
-##### 2. Point Your Domain to the IP
-In your DNS provider (e.g., Google Domains, Cloudflare), add an A record:
-```
-Type: A
-Name: api-lab (or your subdomain choice)
-Value: <IP_FROM_STEP_1>
-TTL: 300
-```
-
-For example, if your domain is `learningaier.com`, this creates `api-lab.learningaier.com`.
-
-##### 3. Update Backend Service to NodePort
-```bash
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: learningaier-backend
-  labels:
-    app: learningaier-backend
+2) Update Service to NodePort (Ingress target)  
+```yaml
+# k8s/backend-service.yaml
 spec:
-  type: NodePort  # Changed from LoadBalancer
+  type: NodePort
   ports:
     - port: 80
       targetPort: 8080
-      protocol: TCP
       name: http
-  selector:
-    app: learningaier-backend
-EOF
 ```
+Apply: `kubectl apply -f k8s/backend-service.yaml`
 
-##### 4. Update Ingress Configuration
-Edit `k8s/backend-ingress.yaml` and replace `api.learningaier.com` with your actual domain:
-
+3) Create Ingress + Managed Certificate  
 ```yaml
+# k8s/backend-ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: learningaier-backend-ingress
   annotations:
     kubernetes.io/ingress.class: "gce"
-    kubernetes.io/ingress.allow-http: "true"
-    networking.gke.io/managed-certificates: "backend-cert"
     kubernetes.io/ingress.global-static-ip-name: "learningaier-backend-ip"
+    networking.gke.io/managed-certificates: "backend-cert"
 spec:
   rules:
-    - host: api-lab.learningaier.com  # ← YOUR DOMAIN HERE
-      http:
-        paths:
-          - path: /*
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: learningaier-backend
-                port:
-                  number: 80
+  - host: api.learningaier.com   # your domain
+    http:
+      paths:
+      - path: /*
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: learningaier-backend
+            port:
+              number: 80
 ---
 apiVersion: networking.gke.io/v1
 kind: ManagedCertificate
@@ -115,42 +75,27 @@ metadata:
   name: backend-cert
 spec:
   domains:
-    - api-lab.learningaier.com  # ← YOUR DOMAIN HERE
+  - api.learningaier.com
+```
+Apply: `kubectl apply -f k8s/backend-ingress.yaml`
+
+4) DNS (Cloud DNS or your provider)  
+Create A record: `api.learningaier.com → <STATIC_IP_FROM_STEP_1>`
+
+5) Wait for cert (15–60 min)  
+`kubectl describe managedcertificate backend-cert` → `Status: Active`
+
+6) Frontend env  
+```bash
+VITE_API_BASE_URL_LAB=https://api.learningaier.com
 ```
 
-Apply it:
+7) Test  
+`curl https://api.learningaier.com/health`
+
+## Optional: Cloudflare Tunnel (no domain)
 ```bash
-kubectl apply -f k8s/backend-ingress.yaml
-```
-
-##### 5. Wait for SSL Certificate (15-60 minutes)
-Check certificate status:
-```bash
-kubectl describe managedcertificate backend-cert
-```
-
-Wait for `Status: Active`
-
-##### 6. Update .env.production
-```bash
-VITE_API_BASE_URL_LAB=https://api-lab.learningaier.com
-```
-
-##### 7. Test
-```bash
-curl https://api-lab.learningaier.com/health
-```
-
----
-
-#### **2B: Use Cloudflare Tunnel** (No Domain Needed, Free SSL)
-
-If you don't have a domain or don't want to manage DNS:
-
-##### 1. Install Cloudflare Tunnel in GKE
-```bash
-# This will give you a free HTTPS URL like https://xyz.trycloudflare.com
-kubectl apply -f - <<EOF
+kubectl apply -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -168,36 +113,23 @@ spec:
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:latest
-        args:
-        - tunnel
-        - --no-autoupdate
-        - --url
-        - http://learningaier-backend:80
+        args: [ "tunnel", "--no-autoupdate", "--url", "http://learningaier-backend:80" ]
 EOF
+kubectl logs -l app=cloudflared --tail=20  # grab https://xyz.trycloudflare.com
 ```
+Note: quick tunnels change on restart; use Zero Trust for permanent hostnames.
 
-##### 2. Get the HTTPS URL
-```bash
-kubectl logs -l app=cloudflared --tail=20
-# Look for: "Your quick Tunnel has been created! Visit it at: https://xyz.trycloudflare.com"
-```
-
-##### 3. Update .env.production
-```bash
-VITE_API_BASE_URL_LAB=https://xyz.trycloudflare.com
-```
-
-**Note:** Free Cloudflare tunnels change URLs on restart. For permanent URLs, sign up for Cloudflare Zero Trust.
-
----
+## Deep Dive (kept for reference)
+- **Mixed content**: HTTPS pages cannot call HTTP APIs. Fix = HTTPS on backend.  
+- **Layer 4 vs Layer 7**: old LB (L4) only forwarded TCP; new GCE Ingress (L7) terminates HTTPS, handles certs, and routes HTTP inside the cluster.  
+- **TLS termination**: HTTPS ends at the load balancer/ingress; traffic to pods is HTTP on the private network.  
+- **Cloud Run vs GKE**: Cloud Run hides a shared ingress (`*.run.app` certs). On GKE you must configure ingress, DNS, and certs yourself.  
+- **Domains**: SSL needs a name (e.g., `api.learningaier.com`), not a raw IP.
 
 ## Quick Decision Guide
-
-**Do you have a domain name?**
-- ✅ **Yes** → Use Option 2A (Google Load Balancer with SSL)
-- ❌ **No** → Use Option 1 (Cloud Run) or Option 2B (Cloudflare Tunnel)
-
-**Do you need the GKE features (Redis, Worker)?**
+- Have a domain and want GKE features (Redis/Worker)? → Use GKE Ingress + managed cert.  
+- Need fastest fix or no domain? → Use Cloud Run endpoint or Cloudflare Tunnel.  
+- Changing service type back to LoadBalancer will drop the ingress flow; keep it NodePort when using GCE Ingress.
 - ✅ **Yes** → Set up HTTPS (Option 2A or 2B)
 - ❌ **No** → Keep using Cloud Run (Option 1 - current)
 

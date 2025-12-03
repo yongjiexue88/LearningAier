@@ -1,7 +1,7 @@
-# Port Configuration Verification Report
+# Port Configuration & Standardization
 
 **Date**: 2025-11-30  
-**Purpose**: Verify all ports are aligned across Docker, Kubernetes, and environment variables
+**Purpose**: Verify all ports across Docker/Kubernetes/env vars and standardize local defaults
 
 ---
 
@@ -181,6 +181,21 @@ Redis server listens on 6379 ✅
 ```
 
 **Status**: ✅ **ALIGNED**
+
+---
+
+## 4. Local Standard Ports
+
+| Service          | Port | Notes/Config                                                      |
+|------------------|------|-------------------------------------------------------------------|
+| Backend (FastAPI)| 8080 | `backend-fastapi/.env.local` → `PORT=8080`; Cloud Run defaults 8080 |
+| Frontend (Vite)  | 5173 | Vite default                                                      |
+| Frontend API     | 8080 | `frontend/.env.local` → `VITE_API_BASE_URL=http://localhost:8080` |
+
+### Key standardization actions
+- Updated docs/env to prefer backend `PORT=8080` for local runs (previously 8787 in some notes).
+- Ensure `VITE_API_BASE_URL` matches backend port when overriding.
+- If you change ports, update both backend `PORT` and frontend `VITE_API_BASE_URL` together.
 
 ---
 

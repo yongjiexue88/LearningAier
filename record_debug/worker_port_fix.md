@@ -1,115 +1,82 @@
-# Worker Port Configuration Fix
+# Worker Port Configuration Fix (Final)
 
 **Date**: 2025-11-30  
-**Issue**: Document worker not being called after PDF upload  
-**Root Cause**: Port mismatch between backend configuration and worker service
+**Issue**: Backend → Worker calls failing after PDF upload due to service/URL port mismatch  
+**Final State**: Service exposes **8000**, backend calls **8000**, container listens on **8000**
 
 ---
 
-## Problem Identified
+## Timeline of Fixes
 
-### Worker Service Configuration:
-```yaml
-# k8s/worker-deployment.yaml (Service spec)
-spec:
-  ports:
-    - port: 80           # ← Service exposes port 80
-      targetPort: 8000   # ← Pod listens on 8000
-```
+1) **Initial attempt (backend change, Service on 80)**  
+- Worker Service exposed `port: 80` / `targetPort: 8000`.  
+- Backend env pointed to `http://document-worker:8000` (wrong).  
+- Temporary mitigation: change backend to call port **80**.
 
-### Backend Configuration (WRONG):
 ```yaml
-# k8s/backend-deployment.yaml
+# k8s/backend-deployment.yaml (initial mitigation)
 env:
   - name: WORKER_SERVICE_URL
-    value: "http://document-worker:8000"  # ← Trying to call port 8000
+    value: "http://document-worker:80"
 ```
 
-**Problem**: Backend was calling `document-worker:8000`, but the service only exposes port 80!
-
----
-
-## Solution
-
-### Changed Backend Configuration:
-```yaml
-# k8s/backend-deployment.yaml
-env:
-  - name: WORKER_SERVICE_URL
-    value: "http://document-worker:80"  # ← Now correctly calling port 80
-```
-
-### How It Works Now:
-```
-Backend Pod → http://document-worker:80 → Worker Service (port 80) → Worker Pod (port 8000)
-```
-
-The Kubernetes Service handles the port mapping:
-- External callers use port **80**
-- Service forwards to container port **8000**
-
----
-
-## Commands Executed
+2) **Final fix (Service change, keep backend on 8000)**  
+- Cloud quota blocked backend rollout, so we flipped the Service to expose **8000** instead.  
+- Backend kept `http://document-worker:8000`, matching the container.
 
 ```bash
-# 1. Update backend deployment
-kubectl apply -f k8s/backend-deployment.yaml
+kubectl patch svc document-worker \
+  --type='json' \
+  -p='[{"op":"replace","path":"/spec/ports/0/port","value":8000}]'
+```
 
-# 2. Wait for rollout
-kubectl rollout status deployment/learningaier-backend
+Current path:  
+```
+Backend Pod → http://document-worker:8000 → Service (8000) → Worker Pod (8000)
+```
+
+---
+
+## Files to Keep Aligned
+
+### Service (current)
+```yaml
+# k8s/worker-service.yaml
+spec:
+  ports:
+  - name: http
+    port: 8000      # exposes 8000
+    targetPort: 8000
+```
+
+### Backend env
+```
+WORKER_SERVICE_URL=http://document-worker:8000
+```
+
+### Local dev (optional)
+```
+WORKER_SERVICE_URL=http://localhost:8000
 ```
 
 ---
 
 ## Verification
 
-### Test worker connectivity:
 ```bash
-# From backend pod
-kubectl exec -it <backend-pod> -- wget -O- http://document-worker:80/health
-```
+# Service port
+kubectl get svc document-worker -o wide
 
-### Upload a PDF and check logs:
-```bash
-# Backend logs (should show worker call)
+# Health from backend pod
+kubectl exec -it <backend-pod> -- wget -O- http://document-worker:8000/health
+
+# Logs
 kubectl logs -l app=learningaier-backend --tail=50 | grep worker
-
-# Worker logs (should show processing request)
 kubectl logs -l app=document-worker --tail=50
 ```
 
 ---
 
-## Why This Happened
-
-When I set up the backend, I assumed the worker service would expose port 8000 (matching the container port), but the existing worker service was configured to expose port 80.
-
-**Standard Kubernetes Pattern**:
-- Services typically expose port **80** (HTTP) or **443** (HTTPS)
-- Even if the pod listens on a different port (like 8000)
-- The service handles the port mapping internally
-
----
-
-## Updated Environment Variables
-
-**Local (.env.local)**:
-```bash
-WORKER_SERVICE_URL=http://localhost:8000  # Direct to worker (no service)
-```
-
-**GKE (.env.lab)** - Should also be updated to:
-```bash
-WORKER_SERVICE_URL=http://document-worker:80  # Via Kubernetes service
-```
-
----
-
-## Summary
-
-✅ **Fixed**: Backend now calls worker on correct port (80)  
-✅ **Deployed**: New backend pods with updated configuration  
-🧪 **Next**: Upload a PDF to test end-to-end flow  
-
-The worker should now receive PDF processing requests!
+## Notes
+- ClusterIP only (no external LB) — see `worker_loadbalancer_removal.md` for context.
+- If you ever change the Service port again, adjust `WORKER_SERVICE_URL` to match. Keeping them aligned avoids 502s/timeouts.
