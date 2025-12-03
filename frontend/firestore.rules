@@ -28,6 +28,14 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
     
+    match /pomodoro_tasks/{taskId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    match /pomodoro_sessions/{sessionId} {
+      allow read, write: if isAuthenticated();
+    }
+    
     match /chats/{chatId} {
       allow read, write: if isAuthenticated();
     }
