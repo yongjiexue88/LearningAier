@@ -27,6 +27,8 @@ import { useState } from "react";
 import HubIcon from "@mui/icons-material/HubRounded";
 import ChatIcon from "@mui/icons-material/ChatRounded";
 import DrawIcon from "@mui/icons-material/DrawRounded";
+import Logo from "../components/Logo";
+
 
 const workspaceItems = [
   { label: "Dashboard", icon: <DashboardIcon />, to: "/" },
@@ -74,14 +76,20 @@ export function SidebarContent({
         justifyContent="space-between"
       >
         {!collapsed && (
-          <Stack spacing={0.5}>
-            <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.125rem" }}>
-              Study Assistant
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
-              AI-powered study workspace
-            </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Logo size={36} />
+            <Stack spacing={0.5}>
+              <Typography variant="h6" fontWeight={600} sx={{ fontSize: "1.125rem" }}>
+                LearningAier
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.75rem" }}>
+                AI-powered study workspace
+              </Typography>
+            </Stack>
           </Stack>
+        )}
+        {collapsed && (
+          <Logo size={36} />
         )}
         <IconButton
           size="small"

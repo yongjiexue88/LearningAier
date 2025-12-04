@@ -1,4 +1,3 @@
-import LockOpenIcon from "@mui/icons-material/LockOpenRounded";
 import {
   Alert,
   Box,
@@ -13,6 +12,8 @@ import {
 import { FormEvent, useState } from "react";
 import { Link as RouterLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../providers/AuthProvider";
+import Logo from "../../components/Logo";
+
 
 export function LoginPage() {
   const { signIn } = useAuth();
@@ -60,11 +61,11 @@ export function LoginPage() {
       <Card sx={{ maxWidth: 400, width: "100%", boxShadow: 6 }}>
         <CardContent component="form" onSubmit={handleSubmit}>
           <Stack spacing={2}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <LockOpenIcon color="primary" />
-              <div>
+            <Stack spacing={2} alignItems="center" sx={{ width: "100%", mb: 1 }}>
+              <Logo size={80} />
+              <div style={{ textAlign: "center" }}>
                 <Typography variant="h5" fontWeight={700}>
-                  Study Assistant
+                  LearningAier
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Sign in to continue
