@@ -1,6 +1,6 @@
 # LearningAier | AI Bilingual Learning & Memory Assistant
 
-> Portfolio-style overview of AI bilingual notes, RAG chat, flashcards with ML scheduling, PDF processing, knowledge graph, collaborative whiteboard, and analytics
+![LearningAier Infographic](frontend/src/assets/images/LearningAier-infographic.png)
 
 ## Product Highlights
 - 📝 Bilingual notes with AI translation and terminology extraction
