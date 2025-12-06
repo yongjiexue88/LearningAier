@@ -12,39 +12,11 @@
 
 ## Runtime Architecture
 
-```mermaid
-flowchart LR
-    User[Browser<br/>React SPA] --> Hosting[Firebase Hosting<br/>CDN]
-    Hosting --> Ingress[HTTPS Load Balancer<br/>GKE Ingress]
-    Ingress --> API[FastAPI API<br/>GKE Deployment + Service]
-    User -->|SDK| Auth[Firebase Auth]
-    User -->|Realtime/Offline| Firestore[(Firestore)]
-
-    API -->|ID Token verify| Auth
-    API --> Firestore
-    API --> Storage[(Cloud Storage)]
-    API --> Pinecone[(Pinecone<br/>Vector DB)]
-    API --> Gemini[Vertex AI / Gemini]
-    API --> BigQuery[(BigQuery<br/>LLMOps/Analytics)]
-    Firestore -->|daily cron export| BigQuery
-
-    API -->|queue PDF jobs| Redis[(Redis Queue)]
-    Redis --> Worker[Document Worker<br/>GKE Deployment + Service]
-    Worker --> Storage
-    Worker --> Firestore
-    Worker --> Pinecone
-```
+![Runtime Architecture](frontend/src/assets/images/runtime.png)
 
 ## Cloud & DevOps (Google Cloud + Firebase)
 
-```mermaid
-flowchart LR
-    GitHub[GitHub Actions] --> CB[Cloud Build]
-    CB --> AR[Artifact Registry]
-    AR --> CD[Cloud Deploy<br/>dev → stg]
-    CD --> GKE[GKE Backend + Worker]
-    GitHub --> Hosting[Firebase Hosting]
-```
+![Cloud & DevOps Flow](frontend/src/assets/images/dev.png)
 
 - GKE hosts the FastAPI backend, document Worker, and Redis queue (see `k8s/` and `record_debug/GKE_WORKER_ARCHITECTURE.md`)
 - Cloud Build + Cloud Deploy pipeline defined in `clouddeploy.yaml` and `record_debug/CLOUD_BUILD_DEPLOY.md`
