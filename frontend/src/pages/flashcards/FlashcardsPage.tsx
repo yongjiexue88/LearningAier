@@ -125,6 +125,12 @@ function mapFlashcardDoc(
   docSnap: QueryDocumentSnapshot<DocumentData>
 ): FlashcardRecord {
   const data = docSnap.data();
+  const nextDueRaw = data.next_due_at ?? data.next_review; // API stores next_review; UI expects next_due_at
+  const nextDueAt =
+    nextDueRaw instanceof Timestamp
+      ? nextDueRaw.toDate().toISOString()
+      : nextDueRaw ?? null;
+
   return {
     id: docSnap.id,
     user_id: data.user_id,
@@ -135,7 +141,7 @@ function mapFlashcardDoc(
     definition: data.definition,
     context: data.context,
     category: data.category,
-    next_due_at: data.next_due_at instanceof Timestamp ? data.next_due_at.toDate().toISOString() : data.next_due_at,
+    next_due_at: nextDueAt,
     interval: data.interval,
     ease_factor: data.ease_factor,
     created_at: data.created_at instanceof Timestamp ? data.created_at.toDate().toISOString() : data.created_at,
@@ -263,7 +269,8 @@ export function FlashcardsPage() {
       );
       try {
         const snapshot = await getDocs(
-          query(baseQuery, orderBy("next_due_at", "asc"))
+          // Order by backend field name (next_review) so refreshed cards move down the queue
+          query(baseQuery, orderBy("next_review", "asc"))
         );
         return snapshot.docs.map(mapFlashcardDoc);
       } catch (error) {
@@ -475,12 +482,16 @@ export function FlashcardsPage() {
       {
         onSuccess: () => {
           setShowAnswerFor(null);
-          setActiveCardId(null); // Reset active card to allow the next one to be picked
+          // Move to the next card immediately; will re-sync after query invalidation
+          const nextCard = filteredFlashcards.find((c) => c.id !== cardId);
+          setActiveCardId(nextCard ? nextCard.id : null);
           queryClient.invalidateQueries({ queryKey: ["flashcards", "list", userId] });
           queryClient.invalidateQueries({ queryKey: ["flashcards", "reviews", userId] });
 
           if (useMLScheduler && predictionMsg) {
             showSnackbar(predictionMsg, "info");
+          } else {
+            showSnackbar("Review saved", "success");
           }
         },
         onError: (error: any) => {
