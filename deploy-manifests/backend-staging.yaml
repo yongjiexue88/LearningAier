@@ -23,26 +23,55 @@ spec:
           env:
             - name: APP_ENV
               value: staging
-            - name: LLM_PROVIDER
-              value: vertex_ai
-            - name: VERTEX_PROJECT_ID
+            - name: FIREBASE_PROJECT_ID
               value: learningaier-lab
-            - name: VERTEX_LOCATION
-              value: us-central1
-            - name: VERTEX_GEMINI_MODEL
-              value: gemini-2.0-flash-exp
-            - name: VERTEX_EMBEDDING_MODEL
-              value: text-embedding-004
+            - name: FIREBASE_STORAGE_BUCKET
+              value: learningaier.firebasestorage.app
+            - name: FIREBASE_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-credentials
+                  key: latest
+            # LLM Provider: Google AI (Gemini API)
+            - name: LLM_PROVIDER
+              value: google_ai
             - name: LLM_MODEL
               value: gemini-2.0-flash-exp
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+            # Embeddings
             - name: EMBEDDINGS_PROVIDER
               value: gemini
             - name: EMBEDDINGS_MODEL
               value: text-embedding-004
+            - name: EMBEDDINGS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
             - name: EMBEDDINGS_DIMENSIONS
               value: '768'
             - name: VECTOR_DB_PROVIDER
               value: pinecone
+            - name: PINECONE_INDEX_NAME
+              value: learningaier-index
+            - name: PINECONE_INDEX_HOST
+              value: https://learningaier-index-zrljhnf.svc.aped-4627-b74a.pinecone.io
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pinecone-api-key
+                  key: latest
+            - name: BIGQUERY_PROJECT_ID
+              value: learningaier-lab
+            - name: BIGQUERY_DATASET_ID
+              value: learningaier_analytics
+            - name: ENABLE_REDIS_CACHE
+              value: "false"
+
           resources:
             limits:
               cpu: '2'

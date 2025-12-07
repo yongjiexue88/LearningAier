@@ -148,12 +148,14 @@ class VertexLLMClient:
         
         embeddings = []
         
-        # Vertex AI embedding API processes in batches
-        # For consistency with Google AI implementation, process sequentially
-        for text in texts:
-            embedding_result = await model.get_embeddings_async([text])
-            # embedding_result is a list of TextEmbedding objects
-            embeddings.append(embedding_result[0].values)
+        # Vertex AI embedding API supports up to 250 texts per request
+        # Process in a single batch
+        if not texts:
+            return []
+            
+        embedding_results = await model.get_embeddings_async(texts)
+        # embedding_results is a list of TextEmbedding objects
+        embeddings = [result.values for result in embedding_results]
         
         return embeddings
     

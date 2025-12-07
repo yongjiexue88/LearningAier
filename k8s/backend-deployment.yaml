@@ -49,23 +49,27 @@ spec:
                   name: firebase-service-account
                   key: json_key
             
-            # LLM Provider: Vertex AI
+            # LLM Provider: Google AI (Gemini API)
             - name: LLM_PROVIDER
-              value: "vertex_ai"
-            - name: VERTEX_PROJECT_ID
-              value: "learningaier-lab"
-            - name: VERTEX_LOCATION
-              value: "us-central1"
-            - name: VERTEX_GEMINI_MODEL
+              value: "google_ai"
+            - name: LLM_MODEL
               value: "gemini-2.0-flash-exp"
-            - name: VERTEX_EMBEDDING_MODEL
-              value: "text-embedding-004"
-            
-            # Note: LLM_API_KEY not needed for Vertex AI with Workload Identity
             - name: LLM_API_KEY
-              value: "not-needed-with-vertex"
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-config
+                  key: api_key
+            
+            # Embeddings
+            - name: EMBEDDINGS_PROVIDER
+              value: "gemini"
+            - name: EMBEDDINGS_MODEL
+              value: "text-embedding-004"
             - name: EMBEDDINGS_API_KEY
-              value: "not-needed-with-vertex"
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-config
+                  key: api_key
             
             # Vector DB (Pinecone)
             - name: PINECONE_API_KEY
@@ -87,9 +91,7 @@ spec:
             - name: BIGQUERY_DATASET_ID
               value: "learningaier_analytics"
             
-            # ML Models
-            - name: FLASHCARD_MODEL_ENDPOINT_ID
-              value: "3297434272188596224"
+            # ML Models: Using local inference (no Vertex AI Endpoint)
             
             # Worker Service (GKE internal)
             - name: WORKER_SERVICE_URL

@@ -1,7 +1,7 @@
 
 import logging
 from typing import Dict, Any, Optional
-from google.cloud import aiplatform
+
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -11,19 +11,31 @@ class MLPredictionService:
     
     def __init__(self):
         self.settings = get_settings()
-        self.project_id = self.settings.vertex_project_id or self.settings.firebase_project_id
-        self.location = self.settings.vertex_location
-        self.endpoint_id = self.settings.flashcard_model_endpoint_id
+        self.model = None
         
-        # Initialize Vertex AI SDK
+        # Load local model artifacts
         try:
-            aiplatform.init(project=self.project_id, location=self.location)
+            import joblib
+            import os
+            
+            # Path relative to this file: ../../local_model_artifacts
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            backend_dir = os.path.dirname(os.path.dirname(current_dir))
+            model_path = os.path.join(backend_dir, "local_model_artifacts", "model.joblib")
+            
+            if os.path.exists(model_path):
+                logger.info(f"Loading local ML model from {model_path}")
+                self.model = joblib.load(model_path)
+                logger.info("Local ML model loaded successfully")
+            else:
+                logger.warning(f"Local model not found at {model_path}")
+                
         except Exception as e:
-            logger.warning(f"Failed to initialize Vertex AI: {e}")
+            logger.error(f"Failed to load local ML model: {e}")
 
     async def predict_next_interval(self, features: Dict[str, Any]) -> Optional[int]:
         """
-        Predict the next interval for a flashcard using the ML model.
+        Predict the next interval for a flashcard using the local ML model.
         
         Args:
             features: Dictionary of features expected by the model.
@@ -31,8 +43,8 @@ class MLPredictionService:
         Returns:
             Predicted interval in days, or None if prediction fails.
         """
-        if not self.endpoint_id:
-            logger.warning("No ML endpoint ID configured. Skipping prediction.")
+        if not self.model:
+            logger.warning("No local ML model loaded. Skipping prediction.")
             return None
             
         try:
@@ -61,12 +73,13 @@ class MLPredictionService:
                 float(features.get('user_avg_rating', 3.0))
             ]
             
-            endpoint = aiplatform.Endpoint(self.endpoint_id)
-            prediction = endpoint.predict(instances=[instance])
+            # Run prediction locally
+            # Scikit-learn expects 2D array [n_samples, n_features]
+            prediction = self.model.predict([instance])
             
             # Parse prediction result
             # Model returns buckets: 1, 2, 3, 4
-            predicted_bucket = int(prediction.predictions[0])
+            predicted_bucket = int(prediction[0])
             
             # Map bucket to days
             # 1: 1 day
@@ -84,11 +97,10 @@ class MLPredictionService:
             
             # Log prediction for monitoring
             log_payload = {
-                "event": "ml_prediction",
+                "event": "ml_prediction_local",
                 "features": instance,
                 "predicted_bucket": predicted_bucket,
-                "predicted_days": result,
-                "model_endpoint": self.endpoint_id
+                "predicted_days": result
             }
             logger.info(f"ML Prediction: {log_payload}")
             
