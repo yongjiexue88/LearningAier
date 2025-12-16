@@ -1,0 +1,63 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend-fastapi/**'
+      - 'deploy-manifests/**'
+      - 'scripts/migrate_to_cloudrun.sh'
+      - '.github/workflows/deploy-cloud-run.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: learningaier-lab
+  REGION: us-central1
+  BACKEND_IMAGE_NAME: learningaier-backend
+  WORKER_IMAGE_NAME: document-worker
+  ARTIFACT_REPO: us-central1-docker.pkg.dev/learningaier-lab/backend-images
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: 'Set up Cloud SDK'
+        uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: 'Configure Docker'
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      - name: 'Build and Push Worker Image'
+        run: |
+          gcloud builds submit --config backend-fastapi/cloudbuild-worker.yaml --substitutions=SHORT_SHA=${{ github.sha }} .
+
+      # Note: We are using the existing manual build approach for now if needed, 
+      # but ideally we should build the backend image too if it changed.
+      # For now, we will rely on the script which assumes images are built or uses existing ones.
+      # The script 'migrate_to_cloudrun.sh' does NOT build images, it deploys them.
+      # The worker image above builds 'document-worker', let's assume backend is also built or uses latest.
+      
+      - name: 'Build and Push Backend Image'
+        run: |
+           docker build -t $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:${{ github.sha }} -f backend-fastapi/Dockerfile backend-fastapi
+           docker push $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:${{ github.sha }}
+           docker tag $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:${{ github.sha }} $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:latest
+           docker push $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:latest
+
+      - name: 'Run Deployment Script'
+        run: |
+          chmod +x scripts/migrate_to_cloudrun.sh
+          ./scripts/migrate_to_cloudrun.sh
