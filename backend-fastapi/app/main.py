@@ -90,11 +90,19 @@ app.include_router(analytics.router)
 
 
 # CORS middleware
+print(f"🌍 Allowed Origins: {[
+    'https://learningaier-lab.web.app',
+    'https://learningaier-lab.firebaseapp.com',
+    'https://www.learningaier-lab.web.app',
+    'http://localhost:5173',
+    'http://localhost:5174'
+]}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://learningaier-lab.web.app",
         "https://learningaier-lab.firebaseapp.com",
+        "https://www.learningaier-lab.web.app",
         "http://localhost:5173",
         "http://localhost:5174",
     ],
