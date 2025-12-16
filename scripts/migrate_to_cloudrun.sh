@@ -26,6 +26,14 @@ WORKER_URL=$(gcloud run services describe "$WORKER_SERVICE" \
 
 echo "✅ Worker URL: $WORKER_URL"
 
+# 2a. Make Worker Public (optional but likely needed for inter-service if not using internal auth)
+echo "Making Worker public..."
+gcloud run services add-iam-policy-binding "$WORKER_SERVICE" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --region "$REGION" \
+    --project "$PROJECT_ID"
+
 # 3. Deploy Backend Service with Worker URL
 echo "Deploying Backend service..."
 # We use 'replace' to apply the YAML, but we also want to inject the dynamic WORKER_URL.
@@ -44,6 +52,14 @@ gcloud run services update "$BACKEND_SERVICE" \
     --region "$REGION" \
     --project "$PROJECT_ID" \
     --set-env-vars WORKER_SERVICE_URL="$WORKER_URL"
+
+# 3a. Make Backend Public
+echo "Making Backend public..."
+gcloud run services add-iam-policy-binding "$BACKEND_SERVICE" \
+    --member="allUsers" \
+    --role="roles/run.invoker" \
+    --region "$REGION" \
+    --project "$PROJECT_ID"
 
 # 4. Final verification
 BACKEND_URL=$(gcloud run services describe "$BACKEND_SERVICE" \

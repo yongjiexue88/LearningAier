@@ -27,11 +27,7 @@ spec:
               value: learningaier-lab
             - name: FIREBASE_STORAGE_BUCKET
               value: learningaier.firebasestorage.app
-            - name: FIREBASE_CREDENTIALS_JSON
-              valueFrom:
-                secretKeyRef:
-                  name: firebase-credentials
-                  key: latest
+
             
             # LLM Provider: Google AI (Gemini API)
             - name: LLM_PROVIDER
