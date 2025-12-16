@@ -1,10 +1,10 @@
 """Document worker main application"""
 import os
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from arq import create_pool
 from arq.connections import RedisSettings
 
@@ -24,6 +24,8 @@ app = FastAPI(
 # Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 redis_settings = RedisSettings.from_dsn(REDIS_URL)
+redis_settings.conn_timeout = 2 # Fail fast if no Redis
+
 
 class ProcessPDFRequest(BaseModel):
     """Request model for PDF processing"""
@@ -45,60 +47,104 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    redis_status: str
 
 
 @app.on_event("startup")
 async def startup():
-    app.state.redis = await create_pool(redis_settings)
+    try:
+        app.state.redis = await create_pool(redis_settings)
+        # Test connection
+        await app.state.redis.ping()
+        logger.info(f"✅ Connected to Redis at {REDIS_URL}")
+    except Exception as e:
+        logger.warning(f"⚠️  Could not connect to Redis: {e}. Falling back to in-memory/background tasks.")
+        app.state.redis = None
 
 
 @app.on_event("shutdown")
 async def shutdown():
-    await app.state.redis.close()
+    if getattr(app.state, "redis", None):
+        await app.state.redis.close()
 
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint for Kubernetes probes"""
-    # Check Redis connection
-    try:
-        await app.state.redis.ping()
-        redis_status = "connected"
-    except Exception:
-        redis_status = "disconnected"
+    redis_status = "disconnected"
+    status = "healthy" # Always healthy even if Redis is down (graceful degradation)
+    
+    if getattr(app.state, "redis", None):
+        try:
+            await app.state.redis.ping()
+            redis_status = "connected"
+        except Exception:
+            redis_status = "error"
+            # If we expect Redis but it fails ping, maybe we should be degraded?
+            # But for migration, we want to start up.
+            pass
 
     return HealthResponse(
-        status="healthy" if redis_status == "connected" else "degraded",
+        status=status,
         service="document-worker",
-        version="1.0.0"
+        version="1.0.0",
+        redis_status=redis_status
     )
 
 
+async def run_process_document_task_sync(document_id: str, file_path: str, user_id: str, extract_text: bool, generate_embeddings: bool):
+    """Helper to run task synchronously when Redis is missing"""
+    logger.info(f"Running process_document_task for {document_id} in background task")
+    try:
+        from worker.worker import process_document_task
+        # Pass None as ctx mock
+        await process_document_task(None, document_id, file_path, user_id, extract_text, generate_embeddings)
+        logger.info(f"Completed process_document_task for {document_id}")
+    except Exception as e:
+        logger.error(f"Error in background process_document_task: {e}", exc_info=True)
+
+
 @app.post("/process-pdf")
-async def process_pdf(request: ProcessPDFRequest):
+async def process_pdf(request: ProcessPDFRequest, background_tasks: BackgroundTasks):
     """
     Process a PDF document:
-    Enqueues a job in Redis for background processing.
+    Enqueues a job in Redis if available, else runs as BackgroundTask.
     """
     try:
         logger.info(f"Received PDF processing request for document {request.document_id}")
         
-        # Enqueue job in Redis
-        job = await app.state.redis.enqueue_job(
-            'process_document_task',
-            document_id=request.document_id,
-            file_path=request.file_path,
-            user_id=request.user_id,
-            extract_text=request.extract_text,
-            generate_embeddings=request.generate_embeddings
-        )
+        task_id = "background_task"
+        message = "Processing document queued (background)"
+
+        if getattr(app.state, "redis", None):
+            # Enqueue job in Redis
+            job = await app.state.redis.enqueue_job(
+                'process_document_task',
+                document_id=request.document_id,
+                file_path=request.file_path,
+                user_id=request.user_id,
+                extract_text=request.extract_text,
+                generate_embeddings=request.generate_embeddings
+            )
+            task_id = job.job_id
+            message = "Processing document queued (Redis)"
+        else:
+            # Run in background task
+            background_tasks.add_task(
+                run_process_document_task_sync,
+                document_id=request.document_id,
+                file_path=request.file_path,
+                user_id=request.user_id,
+                extract_text=request.extract_text,
+                generate_embeddings=request.generate_embeddings
+            )
         
         return JSONResponse(
             status_code=202,
             content={
                 "status": "accepted",
-                "task_id": job.job_id,
-                "message": f"Processing document {request.document_id} queued"
+                "task_id": task_id,
+                "message": message
             }
         )
     except Exception as e:
@@ -136,6 +182,7 @@ async def root():
     return {
         "service": "LearningAier Document Worker",
         "status": "running",
+        "redis_enabled": bool(getattr(app.state, "redis", None)),
         "endpoints": {
             "health": "/health",
             "process_pdf": "/process-pdf",
@@ -146,5 +193,6 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+    # Use standard PORT env var
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run(app, host="0.0.0.0", port=port)

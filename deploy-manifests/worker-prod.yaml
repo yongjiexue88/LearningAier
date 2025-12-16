@@ -1,0 +1,59 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: learningaier-worker-prod
+  labels:
+    app: document-worker
+    environment: prod
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '3'
+        run.googleapis.com/cpu-boost: 'true'
+    spec:
+      containerConcurrency: 1
+      timeoutSeconds: 600
+      containers:
+        - image: us-central1-docker.pkg.dev/learningaier-lab/backend-images/document-worker:manual-build
+          ports:
+            - name: http1
+              containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: lab
+            
+            # LLM Provider: Google AI (Gemini API)
+            - name: LLM_PROVIDER
+              value: google_ai
+            - name: LLM_MODEL
+              value: gemini-2.0-flash-exp
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+            
+            # Embeddings
+            - name: EMBEDDINGS_PROVIDER
+              value: gemini
+            - name: EMBEDDINGS_MODEL
+              value: text-embedding-004
+            - name: EMBEDDINGS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+                  
+            - name: FIREBASE_PROJECT_ID
+              value: learningaier-lab
+            
+            # Redis Cache (Disabled)
+            - name: REDIS_URL
+              value: "redis://localhost:6379" # Won't be used but good to keep valid URI
+            
+          resources:
+            limits:
+              cpu: '1000m' # Worker might need more CPU for parsing
+              memory: 2Gi # Worker processes documents

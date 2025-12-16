@@ -1,0 +1,86 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: learningaier-backend-prod
+  labels:
+    app: learningaier-backend
+    environment: prod
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: '0'
+        autoscaling.knative.dev/maxScale: '10'
+        run.googleapis.com/cpu-boost: 'true'
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 300
+      containers:
+        - image: us-central1-docker.pkg.dev/learningaier-lab/backend-images/learningaier-backend:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: APP_ENV
+              value: lab
+            - name: FIREBASE_PROJECT_ID
+              value: learningaier-lab
+            - name: FIREBASE_STORAGE_BUCKET
+              value: learningaier.firebasestorage.app
+            - name: FIREBASE_CREDENTIALS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: firebase-credentials
+                  key: latest
+            
+            # LLM Provider: Google AI (Gemini API)
+            - name: LLM_PROVIDER
+              value: google_ai
+            - name: LLM_MODEL
+              value: gemini-2.0-flash-exp
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+            
+            # Embeddings
+            - name: EMBEDDINGS_PROVIDER
+              value: gemini
+            - name: EMBEDDINGS_MODEL
+              value: text-embedding-004
+            - name: EMBEDDINGS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gemini-api-key
+                  key: latest
+            
+            # Vector DB (Pinecone)
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pinecone-api-key
+                  key: latest
+            - name: PINECONE_INDEX_NAME
+              value: "learningaier-index"
+            - name: PINECONE_INDEX_HOST
+              value: "https://learningaier-index-zrljhnf.svc.aped-4627-b74a.pinecone.io"
+
+            # BigQuery
+            - name: BIGQUERY_PROJECT_ID
+              value: "learningaier-lab"
+            - name: BIGQUERY_DATASET_ID
+              value: "learningaier_analytics"
+            
+            # Worker Service (Placeholder - will be updated during deployment)
+            # - name: WORKER_SERVICE_URL
+            #   value: "..."
+
+            # Redis Cache (Disabled for cost)
+            - name: ENABLE_REDIS_CACHE
+              value: "false"
+          
+          resources:
+            limits:
+              cpu: '1000m'
+              memory: 1Gi
