@@ -51,7 +51,7 @@ echo "Updating backend with Worker URL..."
 gcloud run services update "$BACKEND_SERVICE" \
     --region "$REGION" \
     --project "$PROJECT_ID" \
-    --set-env-vars WORKER_SERVICE_URL="$WORKER_URL"
+    --update-env-vars WORKER_SERVICE_URL="$WORKER_URL"
 
 # 3a. Make Backend Public
 echo "Making Backend public..."
