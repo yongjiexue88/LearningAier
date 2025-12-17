@@ -57,7 +57,58 @@ jobs:
            docker tag $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:${{ github.sha }} $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:latest
            docker push $ARTIFACT_REPO/$BACKEND_IMAGE_NAME:latest
 
-      - name: 'Run Deployment Script'
+      - name: 'Deploy Worker Service'
         run: |
-          chmod +x scripts/migrate_to_cloudrun.sh
-          ./scripts/migrate_to_cloudrun.sh
+          gcloud run services replace deploy-manifests/worker-prod.yaml \
+            --region $REGION \
+            --project $PROJECT_ID
+          
+          # Make Worker public
+          gcloud run services add-iam-policy-binding learningaier-worker-prod \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --region $REGION \
+            --project $PROJECT_ID
+
+      - name: 'Get Worker URL'
+        id: worker_url
+        run: |
+          WORKER_URL=$(gcloud run services describe learningaier-worker-prod \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --format 'value(status.url)')
+          echo "url=$WORKER_URL" >> $GITHUB_OUTPUT
+          echo "✅ Worker URL: $WORKER_URL"
+
+      - name: 'Deploy Backend Service'
+        run: |
+          # Apply the full manifest with all environment variables
+          gcloud run services replace deploy-manifests/backend-prod.yaml \
+            --region $REGION \
+            --project $PROJECT_ID
+          
+          # Update with dynamic Worker URL
+          gcloud run services update learningaier-backend-prod \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --set-env-vars WORKER_SERVICE_URL=${{ steps.worker_url.outputs.url }}
+          
+          # Make Backend public
+          gcloud run services add-iam-policy-binding learningaier-backend-prod \
+            --member="allUsers" \
+            --role="roles/run.invoker" \
+            --region $REGION \
+            --project $PROJECT_ID
+
+      - name: 'Verify Deployment'
+        run: |
+          BACKEND_URL=$(gcloud run services describe learningaier-backend-prod \
+            --region $REGION \
+            --project $PROJECT_ID \
+            --format 'value(status.url)')
+          echo "=========================================="
+          echo "✅ Deployment Complete!"
+          echo "Backend URL: $BACKEND_URL"
+          echo "Worker URL: ${{ steps.worker_url.outputs.url }}"
+          echo "=========================================="
+
