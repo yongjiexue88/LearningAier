@@ -36,7 +36,7 @@ spec:
             - name: LLM_PROVIDER
               value: google_ai
             - name: LLM_MODEL
-              value: gemini-2.0-flash-exp
+              value: gemini-2.5-flash
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -19,7 +19,7 @@ FastAPI backend for LearningAier - an AI-powered note-taking and flashcard appli
 - **Database**: Firestore
 - **Storage**: Cloud Storage
 - **Vector DB**: Pinecone
-- **LLM**: Google Gemini (gemini-2.0-flash-exp, text-embedding-004)
+- **LLM**: Google Gemini (gemini-2.5-flash, text-embedding-004)
 - **PDF**: PyPDF2
 
 ## Project Structure
@@ -119,7 +119,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8080 --workers 4
 🔌 Port: 8080
 🔥 Firebase Project: learningaier-lab
 🤖 LLM Provider: vertex_ai
-🤖 LLM Model: gemini-2.0-flash-exp
+🤖 LLM Model: gemini-2.5-flash
 📊 Vector DB: pinecone
 ✅ Firebase Admin SDK initialized successfully
 ✅ Vertex AI initialized (Project: learningaier-lab, Location: us-central1)
@@ -317,7 +317,7 @@ FIREBASE_STORAGE_BUCKET: learningaier.firebasestorage.app
 # Paste your full JSON service account key as a single line string
 FIREBASE_CREDENTIALS_JSON: '{"type":"service_account",...}'
 LLM_PROVIDER: gemini
-LLM_MODEL: gemini-2.0-flash-lite
+LLM_MODEL: gemini-2.5-flash
 LLM_API_KEY: AIzaSy...
 EMBEDDINGS_PROVIDER: gemini
 EMBEDDINGS_MODEL: text-embedding-004

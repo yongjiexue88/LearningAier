@@ -23,14 +23,14 @@ class Settings(BaseSettings):
     
     # LLM
     llm_provider: str = "google_ai"  # "google_ai" or "vertex_ai"
-    llm_model: str = "gemini-2.0-flash-exp"
+    llm_model: str = "gemini-2.5-flash"
     llm_api_key: str
     llm_base_url: Optional[str] = None
     
     # Vertex AI (optional, used when llm_provider = "vertex_ai")
     vertex_project_id: Optional[str] = None
     vertex_location: str = "us-central1"
-    vertex_gemini_model: str = "gemini-2.0-flash-exp"
+    vertex_gemini_model: str = "gemini-2.5-flash"
     vertex_embedding_model: str = "text-embedding-004"
     
     # Embeddings

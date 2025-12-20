@@ -79,7 +79,7 @@ class FlashcardService:
             feature="flashcards",
             prompt_template_name=template_name,
             prompt_version=prompt_version,
-            model_name="gemini-2.0-flash-exp",
+            model_name="gemini-2.5-flash",
             additional_data={
                 "note_id": note_id,
                 "flashcard_count": count,
